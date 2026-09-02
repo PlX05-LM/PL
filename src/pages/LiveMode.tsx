@@ -5,6 +5,7 @@ import { db } from '../db'
 import { channelNameFor, type ProjectorMessage } from '../lib/projectorChannel'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { resolveAudioDuration } from '../lib/audioDuration'
+import { computePace, paceLabel } from '../lib/pace'
 
 function formatClock(sec: number) {
   if (!Number.isFinite(sec)) return '--:--'
@@ -48,6 +49,11 @@ export default function LiveMode() {
 
   const segments = ceremony?.segments ?? []
   const currentSegment = segments[segmentIndex]
+
+  const pace = useMemo(
+    () => (startedAt !== null ? computePace(segments, segmentIndex, elapsed) : null),
+    [segments, segmentIndex, elapsed, startedAt],
+  )
 
   const slidePhotos = useMemo(() => {
     if (!ceremony) return []
@@ -273,6 +279,20 @@ export default function LiveMode() {
           <div className="font-mono text-sm text-muted">
             {formatClock(elapsed)} / {formatClock(totalEstimated)}
           </div>
+          {pace && (
+            <span
+              title="Compare le temps écoulé à la durée prévue des étapes déjà passées"
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                pace.tone === 'behind'
+                  ? 'border-danger text-danger'
+                  : pace.tone === 'ahead'
+                    ? 'border-gold-dim text-gold'
+                    : 'border-line text-muted'
+              }`}
+            >
+              {paceLabel(pace)}
+            </span>
+          )}
           {startedAt === null ? (
             <button
               onClick={() => setStartedAt(Date.now())}

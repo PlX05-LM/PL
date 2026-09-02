@@ -5,6 +5,7 @@ import { db } from '../db'
 import { newId } from '../lib/ids'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { collectCeremonyTracks } from '../lib/ceremonyTracks'
+import TextLibraryModal from '../components/TextLibraryModal'
 import type {
   Ceremony,
   CeremonySegment,
@@ -88,6 +89,17 @@ export default function CeremonyEditor() {
     if (target < 0 || target >= segments.length) return
     ;[segments[index], segments[target]] = [segments[target], segments[index]]
     update({ segments })
+  }
+
+  const [textLibraryForSegment, setTextLibraryForSegment] = useState<string | null>(null)
+
+  function insertText(segId: string, text: string) {
+    if (!draft) return
+    const segment = draft.segments.find((s) => s.id === segId)
+    if (!segment) return
+    const script = segment.script.trim() ? `${segment.script}\n\n${text}` : text
+    updateSegment(segId, { script })
+    setTextLibraryForSegment(null)
   }
 
   function togglePhoto(photoId: string) {
@@ -311,13 +323,22 @@ export default function CeremonyEditor() {
                       Supprimer
                     </button>
                   </div>
-                  <textarea
-                    value={seg.script}
-                    onChange={(e) => updateSegment(seg.id, { script: e.target.value })}
-                    placeholder="Texte à lire pendant cette étape (affiché en direct dans le prompteur)…"
-                    rows={3}
-                    className="w-full resize-y rounded-md border border-line bg-panel-2 px-3 py-2 text-sm text-fg outline-none placeholder:text-muted focus:border-gold-dim"
-                  />
+                  <div className="flex items-start gap-2">
+                    <textarea
+                      value={seg.script}
+                      onChange={(e) => updateSegment(seg.id, { script: e.target.value })}
+                      placeholder="Texte à lire pendant cette étape (affiché en direct dans le prompteur)…"
+                      rows={3}
+                      className="w-full resize-y rounded-md border border-line bg-panel-2 px-3 py-2 text-sm text-fg outline-none placeholder:text-muted focus:border-gold-dim"
+                    />
+                    <button
+                      onClick={() => setTextLibraryForSegment(seg.id)}
+                      title="Insérer un texte-type (ouverture, transition, hommage, clôture, pensées, repères religieux)"
+                      className="shrink-0 whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+                    >
+                      📖 Texte-type
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -467,6 +488,13 @@ export default function CeremonyEditor() {
           </div>
         </div>
       </section>
+
+      {textLibraryForSegment && (
+        <TextLibraryModal
+          onInsert={(text) => insertText(textLibraryForSegment, text)}
+          onClose={() => setTextLibraryForSegment(null)}
+        />
+      )}
     </div>
   )
 }
