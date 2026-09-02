@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { newId } from '../lib/ids'
 import { formatDuration, resolveAudioDuration } from '../lib/audioDuration'
+import type { BuiltInLibraryProgress } from '../lib/royaltyFreeMusic'
 import type { Track } from '../types'
 
 async function readDuration(blob: Blob): Promise<number | undefined> {
@@ -27,6 +28,18 @@ export default function MusicLibrary() {
   const [playingId, setPlayingId] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [importing, setImporting] = useState(false)
+  const [builtInProgress, setBuiltInProgress] = useState<BuiltInLibraryProgress | null>(null)
+  const hasBuiltInLibrary = tracks.some((t) => t.id.startsWith('builtin-'))
+
+  async function handleImportBuiltInLibrary() {
+    setBuiltInProgress({ index: 0, total: 20, title: '' })
+    try {
+      const { importBuiltInLibrary } = await import('../lib/royaltyFreeMusic')
+      await importBuiltInLibrary((p) => setBuiltInProgress(p))
+    } finally {
+      setBuiltInProgress(null)
+    }
+  }
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -102,6 +115,30 @@ export default function MusicLibrary() {
         </label>
       </div>
 
+      <div className="mb-8 rounded-lg border border-gold-dim/40 bg-panel p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-display text-lg text-fg">Bibliothèque libre de droit</h3>
+            <p className="mt-1 text-sm text-muted">
+              20 compositions originales pensées pour les temps forts d'une cérémonie
+              (entrée, recueillement, hommage, sortie) — créées pour Céréma, 100 % libres
+              de droit, utilisables sans restriction dans un cadre professionnel.
+            </p>
+          </div>
+          <button
+            onClick={handleImportBuiltInLibrary}
+            disabled={!!builtInProgress || hasBuiltInLibrary}
+            className="shrink-0 rounded-md border border-gold-dim px-4 py-2 text-sm font-medium text-gold hover:bg-panel-2 disabled:opacity-50"
+          >
+            {builtInProgress
+              ? `Génération… ${builtInProgress.index}/${builtInProgress.total}`
+              : hasBuiltInLibrary
+                ? '✓ Ajoutée à la bibliothèque'
+                : '+ Ajouter les 20 musiques'}
+          </button>
+        </div>
+      </div>
+
       {tracks.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line p-12 text-center text-muted">
           Aucune musique importée pour le moment.
@@ -121,6 +158,14 @@ export default function MusicLibrary() {
                 onBlur={(e) => rename(t, e.target.value)}
                 className="flex-1 bg-transparent text-sm text-fg outline-none focus:underline"
               />
+              {t.license && (
+                <span
+                  title={t.license}
+                  className="rounded-full border border-gold-dim px-2 py-0.5 text-[10px] text-gold"
+                >
+                  Libre de droit
+                </span>
+              )}
               <span className="text-xs text-muted">{formatDuration(t.duration)}</span>
               <button
                 onClick={() => remove(t)}

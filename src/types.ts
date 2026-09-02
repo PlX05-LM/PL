@@ -8,6 +8,8 @@ export interface Track {
   mimeType: string
   duration?: number
   createdAt: number
+  /** Renseigné pour les pistes de la bibliothèque libre de droit intégrée. */
+  license?: string
 }
 
 export interface Photo {
