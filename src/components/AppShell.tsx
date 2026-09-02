@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useInstallPrompt } from '../lib/useInstallPrompt'
 
 const navItems = [
   { to: '/', label: 'Cérémonies', icon: '🕊️', end: true },
@@ -8,6 +9,8 @@ const navItems = [
 ]
 
 export default function AppShell() {
+  const { canInstall, showIosHint, promptInstall } = useInstallPrompt()
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-ink text-fg">
       <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-panel">
@@ -34,8 +37,23 @@ export default function AppShell() {
             </NavLink>
           ))}
         </nav>
-        <div className="border-t border-line p-4 text-xs text-muted">
-          Fonctionne hors-ligne · données stockées sur cet appareil
+        <div className="border-t border-line p-4">
+          {canInstall && (
+            <button
+              onClick={promptInstall}
+              className="mb-3 w-full rounded-md border border-gold-dim px-3 py-2 text-sm font-medium text-gold hover:bg-panel-2"
+            >
+              ⤓ Installer l'application
+            </button>
+          )}
+          {showIosHint && (
+            <p className="mb-3 text-xs text-muted">
+              Pour l'installer : icône Partager de Safari → « Sur l'écran d'accueil ».
+            </p>
+          )}
+          <p className="text-xs text-muted">
+            Fonctionne hors-ligne · données stockées sur cet appareil
+          </p>
         </div>
       </aside>
       <main className="flex-1 overflow-y-auto">

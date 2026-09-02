@@ -7,19 +7,23 @@ import PhotoLibrary from './pages/PhotoLibrary'
 import LiveMode from './pages/LiveMode'
 import Projector from './pages/Projector'
 import Backup from './pages/Backup'
+import PwaUpdatePrompt from './components/PwaUpdatePrompt'
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/projector/:id" element={<Projector />} />
-      <Route path="/ceremonies/:id/live" element={<LiveMode />} />
-      <Route element={<AppShell />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/ceremonies/:id" element={<CeremonyEditor />} />
-        <Route path="/musique" element={<MusicLibrary />} />
-        <Route path="/photos" element={<PhotoLibrary />} />
-        <Route path="/sauvegarde" element={<Backup />} />
-      </Route>
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/projector/:id" element={<Projector />} />
+        <Route path="/ceremonies/:id/live" element={<LiveMode />} />
+        <Route element={<AppShell />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/ceremonies/:id" element={<CeremonyEditor />} />
+          <Route path="/musique" element={<MusicLibrary />} />
+          <Route path="/photos" element={<PhotoLibrary />} />
+          <Route path="/sauvegarde" element={<Backup />} />
+        </Route>
+      </Routes>
+      <PwaUpdatePrompt />
+    </>
   )
 }

@@ -10,6 +10,8 @@ Application web (PC et tablette) pensée pour les maîtres de cérémonie du fun
 - **Régie live** : écran plein cadre pour le jour de la cérémonie — déroulé cliquable, prompteur (défilement automatique réglable, taille de texte, texte modifiable en direct), lecteur audio avec fondu de sortie, contrôle du diaporama, chronomètre.
 - **Écran de projection** : une fenêtre séparée à envoyer sur un second écran/vidéoprojecteur, synchronisée en temps réel avec la régie via `BroadcastChannel`.
 - **Fonctionne hors-ligne** : toutes les données (cérémonies, musiques, photos) sont stockées localement dans le navigateur (IndexedDB) — aucune connexion internet requise le jour de la cérémonie.
+- **Sauvegarde** : export/import d'une sauvegarde complète (ZIP) de toutes les cérémonies, musiques et photos, à conserver ailleurs que sur l'appareil.
+- **Application installable (PWA)** : à installer sur l'écran d'accueil d'une tablette ou d'un PC comme une vraie application, avec mise en cache de l'appli pour un chargement garanti même sans réseau.
 
 ## Démarrer en développement
 
@@ -32,10 +34,10 @@ npm run preview
 - Dexie.js (IndexedDB) pour le stockage local des cérémonies, musiques et photos
 - React Router pour la navigation
 - `BroadcastChannel` pour synchroniser la régie et l'écran de projection
+- `vite-plugin-pwa` (Workbox) pour le manifeste et le service worker
 
 ## Pistes d'évolution
 
-- Export PDF du déroulé de cérémonie
 - Import de trames PowerPoint/Canva pour le diaporama
 - Mode multi-utilisateur avec synchronisation cloud (pour plusieurs maîtres de cérémonie dans une même agence)
 - Bibliothèque de textes/citations prêts à l'emploi
