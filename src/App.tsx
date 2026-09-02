@@ -6,6 +6,7 @@ import MusicLibrary from './pages/MusicLibrary'
 import PhotoLibrary from './pages/PhotoLibrary'
 import LiveMode from './pages/LiveMode'
 import Projector from './pages/Projector'
+import Backup from './pages/Backup'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/ceremonies/:id" element={<CeremonyEditor />} />
         <Route path="/musique" element={<MusicLibrary />} />
         <Route path="/photos" element={<PhotoLibrary />} />
+        <Route path="/sauvegarde" element={<Backup />} />
       </Route>
     </Routes>
   )

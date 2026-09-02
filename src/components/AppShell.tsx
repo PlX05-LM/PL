@@ -4,6 +4,7 @@ const navItems = [
   { to: '/', label: 'Cérémonies', icon: '🕊️', end: true },
   { to: '/musique', label: 'Musiques', icon: '♪' },
   { to: '/photos', label: 'Photothèque', icon: '⌘' },
+  { to: '/sauvegarde', label: 'Sauvegarde', icon: '⤓' },
 ]
 
 export default function AppShell() {

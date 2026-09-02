@@ -43,6 +43,9 @@ export default function LiveMode() {
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
 
+  const [liveStateHydrated, setLiveStateHydrated] = useState(false)
+  const [resumed, setResumed] = useState(false)
+
   const segments = ceremony?.segments ?? []
   const currentSegment = segments[segmentIndex]
 
@@ -51,6 +54,33 @@ export default function LiveMode() {
     const byId = new Map(allPhotos.map((p) => [p.id, p]))
     return ceremony.slideshow.photoIds.map((pid) => byId.get(pid)).filter(Boolean) as typeof allPhotos
   }, [ceremony, allPhotos])
+
+  // --- Reprise après rechargement/plantage : on restaure l'état une seule fois au chargement ---
+  useEffect(() => {
+    if (!ceremony || liveStateHydrated) return
+    const ls = ceremony.liveState
+    if (ls) {
+      setSegmentIndex(ls.segmentIndex)
+      setStartedAt(ls.startedAt)
+      setSlideIndex(ls.slideIndex)
+      setBlackout(ls.blackout)
+      if (ls.startedAt !== null) setResumed(true)
+    }
+    setLiveStateHydrated(true)
+  }, [ceremony, liveStateHydrated])
+
+  const persistLiveState = useDebouncedCallback(
+    (id: string, state: { segmentIndex: number; startedAt: number | null; slideIndex: number; blackout: boolean }) => {
+      db.ceremonies.update(id, { liveState: state, updatedAt: Date.now() })
+    },
+    400,
+  )
+
+  useEffect(() => {
+    if (!liveStateHydrated || !id) return
+    persistLiveState(id, { segmentIndex, startedAt, slideIndex, blackout })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveStateHydrated, id, segmentIndex, startedAt, slideIndex, blackout])
 
   // --- Elapsed time chrono ---
   useEffect(() => {
@@ -63,7 +93,7 @@ export default function LiveMode() {
   const persistScript = useDebouncedCallback((segId: string, script: string) => {
     if (!ceremony) return
     const segmentsNext = ceremony.segments.map((s) => (s.id === segId ? { ...s, script } : s))
-    db.ceremonies.put({ ...ceremony, segments: segmentsNext, updatedAt: Date.now() })
+    db.ceremonies.update(ceremony.id, { segments: segmentsNext, updatedAt: Date.now() })
   }, 400)
 
   function updateScript(text: string) {
@@ -221,6 +251,14 @@ export default function LiveMode() {
             ← Quitter la régie
           </button>
           <h1 className="font-display text-lg text-fg">{ceremony.title}</h1>
+          {resumed && (
+            <span className="flex items-center gap-2 rounded-full border border-gold-dim px-3 py-1 text-xs text-gold">
+              Reprise de la cérémonie en cours
+              <button onClick={() => setResumed(false)} className="text-muted hover:text-fg">
+                ✕
+              </button>
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <div className="font-mono text-sm text-muted">

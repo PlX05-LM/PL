@@ -41,6 +41,13 @@ export interface CeremonySegment {
 
 export type CeremonyType = 'obseques' | 'creation' | 'inhumation' | 'hommage' | 'autre'
 
+export interface LiveState {
+  segmentIndex: number
+  startedAt: number | null
+  slideIndex: number
+  blackout: boolean
+}
+
 export interface Ceremony {
   id: string
   title: string
@@ -56,6 +63,8 @@ export interface Ceremony {
   slideshow: SlideshowConfig
   createdAt: number
   updatedAt: number
+  /** Permet de reprendre la régie live là où elle en était après un rechargement/plantage. */
+  liveState?: LiveState
 }
 
 export function createEmptyCeremony(id: string): Ceremony {
