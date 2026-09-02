@@ -250,7 +250,14 @@ export default function LiveMode() {
 
   function openProjector() {
     if (!id) return
-    const w = window.open(`/projector/${id}`, 'ceremonia-projector', 'width=1280,height=720')
+    // Avec HashRouter, l'URL de la route est après le #, pas un chemin absolu :
+    // ça reste correct que l'appli soit servie à la racine d'un domaine ou
+    // sous un sous-chemin (ex. GitHub Pages).
+    const w = window.open(
+      `${import.meta.env.BASE_URL}#/projector/${id}`,
+      'ceremonia-projector',
+      'width=1280,height=720',
+    )
     projectorWindowRef.current = w
     setTimeout(sendProjectorState, 500)
   }

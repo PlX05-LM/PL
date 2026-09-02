@@ -27,6 +27,16 @@ npm run build
 npm run preview
 ```
 
+## Déploiement (GitHub Pages)
+
+Un workflow GitHub Actions (`.github/workflows/deploy-pages.yml`) construit et publie
+automatiquement l'application sur GitHub Pages à chaque push. L'appli est servie sous
+`/PL/` (nom du dépôt) : la variable d'environnement `GITHUB_PAGES=true` bascule le
+`base` Vite en conséquence lors du build.
+
+Si Pages n'est pas encore activé sur le dépôt, une seule manipulation ponctuelle est
+nécessaire : Settings → Pages → Build and deployment → Source → **GitHub Actions**.
+
 ## Stack technique
 
 - React + TypeScript + Vite
