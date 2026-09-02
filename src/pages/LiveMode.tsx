@@ -25,7 +25,7 @@ export default function LiveMode() {
   const [fontSize, setFontSize] = useState(40)
   const [autoScroll, setAutoScroll] = useState(false)
   const [scrollSpeed, setScrollSpeed] = useState(28) // px/s
-  const promptRef = useRef<HTMLDivElement>(null)
+  const promptRef = useRef<HTMLTextAreaElement>(null)
 
   const [manualTrackId, setManualTrackId] = useState<string>('')
   const [isPlaying, setIsPlaying] = useState(false)
@@ -113,20 +113,27 @@ export default function LiveMode() {
   // --- Teleprompter auto-scroll ---
   useEffect(() => {
     if (!autoScroll) return
+    const el = promptRef.current
+    if (!el) return
     let raf: number
     let last = performance.now()
+    // scrollTop est un entier côté DOM : à faible vitesse, l'incrément par image
+    // (ex. ~0.46px à 28px/s) est perdu par arrondi si on relit el.scrollTop à
+    // chaque image. On accumule donc la position réelle nous-mêmes, en float.
+    let pos = el.scrollTop
     const tick = (now: number) => {
       const dt = (now - last) / 1000
       last = now
-      const el = promptRef.current
-      if (el) {
-        el.scrollTop += scrollSpeed * dt
-      }
+      pos += scrollSpeed * dt
+      el.scrollTop = pos
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [autoScroll, scrollSpeed])
+    // Le textarea est remonté (key sur l'id de l'étape) à chaque changement
+    // d'étape : il faut relire promptRef.current à ce moment-là, sinon la boucle
+    // continue de défiler l'ancien nœud DOM déjà démonté.
+  }, [autoScroll, scrollSpeed, segmentIndex])
 
   useEffect(() => {
     if (promptRef.current) promptRef.current.scrollTop = 0
@@ -388,14 +395,15 @@ export default function LiveMode() {
               />
             </div>
           </div>
-          <div ref={promptRef} className="flex-1 overflow-y-auto px-10 py-8 scrollbar-thin">
+          <div className="flex-1 overflow-hidden px-10 py-8">
             <textarea
+              ref={promptRef}
               key={currentSegment?.id ?? 'none'}
               defaultValue={currentSegment?.script ?? ''}
               onChange={(e) => updateScript(e.target.value)}
               placeholder="Aucun texte pour cette étape…"
               style={{ fontSize: `${fontSize}px`, lineHeight: 1.5 }}
-              className="min-h-[60vh] w-full resize-none border-none bg-transparent text-fg outline-none placeholder:text-muted"
+              className="h-full w-full resize-none border-none bg-transparent text-fg outline-none scrollbar-thin placeholder:text-muted"
             />
           </div>
           <div className="flex items-center justify-between border-t border-line bg-panel px-4 py-2 text-xs">
