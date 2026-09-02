@@ -4,8 +4,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { channelNameFor, type ProjectorMessage } from '../lib/projectorChannel'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
+import { resolveAudioDuration } from '../lib/audioDuration'
 
 function formatClock(sec: number) {
+  if (!Number.isFinite(sec)) return '--:--'
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
@@ -107,7 +109,9 @@ export default function LiveMode() {
     audio.volume = volume
     audio.onended = () => setIsPlaying(false)
     audio.ontimeupdate = () => setProgress(audio.currentTime)
-    audio.onloadedmetadata = () => setDuration(audio.duration)
+    audio.onloadedmetadata = () => {
+      resolveAudioDuration(audio).then(setDuration)
+    }
     setManualTrackId(trackId)
   }
 

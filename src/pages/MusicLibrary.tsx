@@ -2,21 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { newId } from '../lib/ids'
+import { formatDuration, resolveAudioDuration } from '../lib/audioDuration'
 import type { Track } from '../types'
-
-function formatDuration(sec?: number) {
-  if (!sec || Number.isNaN(sec)) return '--:--'
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
 
 async function readDuration(blob: Blob): Promise<number | undefined> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(blob)
     const audio = new Audio(url)
-    audio.addEventListener('loadedmetadata', () => {
-      resolve(audio.duration)
+    audio.addEventListener('loadedmetadata', async () => {
+      const duration = await resolveAudioDuration(audio)
+      resolve(Number.isFinite(duration) ? duration : undefined)
       URL.revokeObjectURL(url)
     })
     audio.addEventListener('error', () => {
