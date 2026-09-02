@@ -6,6 +6,8 @@ import { channelNameFor, type ProjectorMessage } from '../lib/projectorChannel'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { resolveAudioDuration } from '../lib/audioDuration'
 import { computePace, paceLabel } from '../lib/pace'
+import { loadKeymap, normalizeKey, saveKeymap, type Keymap, type RemoteAction } from '../lib/remoteControl'
+import RemoteControlSettings from '../components/RemoteControlSettings'
 
 function formatClock(sec: number) {
   if (!Number.isFinite(sec)) return '--:--'
@@ -46,6 +48,9 @@ export default function LiveMode() {
 
   const [liveStateHydrated, setLiveStateHydrated] = useState(false)
   const [resumed, setResumed] = useState(false)
+
+  const [keymap, setKeymap] = useState<Keymap>(() => loadKeymap())
+  const [showRemoteSettings, setShowRemoteSettings] = useState(false)
 
   const segments = ceremony?.segments ?? []
   const currentSegment = segments[segmentIndex]
@@ -269,6 +274,79 @@ export default function LiveMode() {
     setTimeout(sendProjectorState, 500)
   }
 
+  // --- Actions pilotables au clavier / à la télécommande ---
+  function goToNextSegment() {
+    setSegmentIndex((i) => Math.min(segments.length - 1, i + 1))
+  }
+  function goToPrevSegment() {
+    setSegmentIndex((i) => Math.max(0, i - 1))
+  }
+  function goToNextSlide() {
+    setSlideIndex((i) => Math.min(slidePhotos.length - 1, i + 1))
+  }
+  function goToPrevSlide() {
+    setSlideIndex((i) => Math.max(0, i - 1))
+  }
+  function toggleSlideshowPlaying() {
+    setSlidesPlaying((p) => !p)
+  }
+  function toggleBlackoutState() {
+    setBlackout((b) => !b)
+  }
+  function toggleAutoScrollState() {
+    setAutoScroll((a) => !a)
+  }
+  function startChronoIfNeeded() {
+    setStartedAt((s) => s ?? Date.now())
+  }
+
+  const remoteActions: Record<RemoteAction, () => void> = {
+    nextSegment: goToNextSegment,
+    prevSegment: goToPrevSegment,
+    toggleMusic: togglePlay,
+    fadeOutMusic: fadeOut,
+    nextSlide: goToNextSlide,
+    prevSlide: goToPrevSlide,
+    toggleSlideshow: toggleSlideshowPlaying,
+    toggleBlackout: toggleBlackoutState,
+    toggleAutoScroll: toggleAutoScrollState,
+    startChrono: startChronoIfNeeded,
+  }
+
+  // Refs toujours à jour pour le gestionnaire clavier ci-dessous, qui n'est
+  // branché qu'une fois : sans elles, il resterait figé sur les fonctions et
+  // le keymap du tout premier rendu (même bug que la synchro projection).
+  const remoteActionsRef = useRef(remoteActions)
+  useEffect(() => {
+    remoteActionsRef.current = remoteActions
+  })
+  const keymapRef = useRef(keymap)
+  useEffect(() => {
+    keymapRef.current = keymap
+  }, [keymap])
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return
+      const key = normalizeKey(e.key)
+      const entries = Object.entries(keymapRef.current) as [RemoteAction, string][]
+      const match = entries.find(([, boundKey]) => normalizeKey(boundKey) === key)
+      if (match) {
+        e.preventDefault()
+        remoteActionsRef.current[match[0]]()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  function updateKeymap(next: Keymap) {
+    setKeymap(next)
+    saveKeymap(next)
+  }
+
   if (!ceremony) {
     return <div className="p-10 text-muted">Chargement…</div>
   }
@@ -312,7 +390,7 @@ export default function LiveMode() {
           )}
           {startedAt === null ? (
             <button
-              onClick={() => setStartedAt(Date.now())}
+              onClick={startChronoIfNeeded}
               className="rounded-md bg-gold px-3 py-1.5 text-sm font-medium text-ink hover:bg-gold-dim"
             >
               Démarrer le chrono
@@ -331,6 +409,13 @@ export default function LiveMode() {
             className="rounded-md border border-gold-dim px-3 py-1.5 text-sm text-gold hover:bg-panel-2"
           >
             🖥 Ouvrir la projection
+          </button>
+          <button
+            onClick={() => setShowRemoteSettings(true)}
+            title="Configurer le clavier ou une télécommande de présentation pour piloter la régie sans toucher l'écran"
+            className="rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:border-gold-dim hover:text-fg"
+          >
+            ⌨️ Télécommande
           </button>
         </div>
       </header>
@@ -368,11 +453,7 @@ export default function LiveMode() {
             <span className="text-muted">{currentSegment?.title ?? 'Aucune étape'}</span>
             <div className="ml-auto flex items-center gap-3">
               <label className="flex items-center gap-1 text-muted">
-                <input
-                  type="checkbox"
-                  checked={autoScroll}
-                  onChange={(e) => setAutoScroll(e.target.checked)}
-                />
+                <input type="checkbox" checked={autoScroll} onChange={toggleAutoScrollState} />
                 Défilement auto
               </label>
               <span className="text-muted">Vitesse</span>
@@ -409,14 +490,14 @@ export default function LiveMode() {
           <div className="flex items-center justify-between border-t border-line bg-panel px-4 py-2 text-xs">
             <div className="flex gap-2">
               <button
-                onClick={() => setSegmentIndex((i) => Math.max(0, i - 1))}
+                onClick={goToPrevSegment}
                 disabled={segmentIndex === 0}
                 className="rounded-md border border-line px-3 py-1 text-muted hover:text-fg disabled:opacity-30"
               >
                 ← Étape précédente
               </button>
               <button
-                onClick={() => setSegmentIndex((i) => Math.min(segments.length - 1, i + 1))}
+                onClick={goToNextSegment}
                 disabled={segmentIndex >= segments.length - 1}
                 className="rounded-md border border-line px-3 py-1 text-muted hover:text-fg disabled:opacity-30"
               >
@@ -493,28 +574,26 @@ export default function LiveMode() {
             )}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSlideIndex((i) => Math.max(0, i - 1))}
+                onClick={goToPrevSlide}
                 className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
               >
                 ⏮
               </button>
               <button
-                onClick={() => setSlidesPlaying((p) => !p)}
+                onClick={toggleSlideshowPlaying}
                 className="flex-1 rounded-md border border-gold-dim px-2 py-1 text-xs text-gold hover:bg-panel-2"
               >
                 {slidesPlaying ? 'Pause diaporama' : 'Lancer diaporama'}
               </button>
               <button
-                onClick={() =>
-                  setSlideIndex((i) => Math.min(slidePhotos.length - 1, i + 1))
-                }
+                onClick={goToNextSlide}
                 className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
               >
                 ⏭
               </button>
             </div>
             <button
-              onClick={() => setBlackout((b) => !b)}
+              onClick={toggleBlackoutState}
               className={`mt-2 w-full rounded-md border px-2 py-1 text-xs ${
                 blackout
                   ? 'border-danger text-danger'
@@ -526,6 +605,14 @@ export default function LiveMode() {
           </div>
         </aside>
       </div>
+
+      {showRemoteSettings && (
+        <RemoteControlSettings
+          keymap={keymap}
+          onChange={updateKeymap}
+          onClose={() => setShowRemoteSettings(false)}
+        />
+      )}
     </div>
   )
 }
