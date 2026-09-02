@@ -1,0 +1,142 @@
+import { useEffect, useRef, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../db'
+import { newId } from '../lib/ids'
+import type { Track } from '../types'
+
+function formatDuration(sec?: number) {
+  if (!sec || Number.isNaN(sec)) return '--:--'
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+async function readDuration(blob: Blob): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob)
+    const audio = new Audio(url)
+    audio.addEventListener('loadedmetadata', () => {
+      resolve(audio.duration)
+      URL.revokeObjectURL(url)
+    })
+    audio.addEventListener('error', () => {
+      resolve(undefined)
+      URL.revokeObjectURL(url)
+    })
+  })
+}
+
+export default function MusicLibrary() {
+  const tracks = useLiveQuery(() => db.tracks.orderBy('name').toArray(), []) ?? []
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [playingId, setPlayingId] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [importing, setImporting] = useState(false)
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return
+    setImporting(true)
+    for (const file of Array.from(files)) {
+      const duration = await readDuration(file)
+      const track: Track = {
+        id: newId(),
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        blob: file,
+        mimeType: file.type || 'audio/mpeg',
+        duration,
+        createdAt: Date.now(),
+      }
+      await db.tracks.add(track)
+    }
+    setImporting(false)
+    if (fileInput.current) fileInput.current.value = ''
+  }
+
+  function togglePlay(track: Track) {
+    if (playingId === track.id) {
+      audioRef.current?.pause()
+      setPlayingId(null)
+      return
+    }
+    const url = URL.createObjectURL(track.blob)
+    if (audioRef.current) {
+      audioRef.current.pause()
+    }
+    const audio = new Audio(url)
+    audio.play()
+    audio.onended = () => setPlayingId(null)
+    audioRef.current = audio
+    setPlayingId(track.id)
+  }
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause()
+    }
+  }, [])
+
+  async function rename(track: Track, name: string) {
+    await db.tracks.update(track.id, { name })
+  }
+
+  async function remove(track: Track) {
+    if (!confirm(`Supprimer "${track.name}" de la bibliothèque ?`)) return
+    if (playingId === track.id) audioRef.current?.pause()
+    await db.tracks.delete(track.id)
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl px-8 py-10">
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-3xl text-fg">Bibliothèque musicale</h2>
+          <p className="mt-1 text-sm text-muted">
+            Importez vos musiques (MP3, WAV, M4A…) pour les assigner aux étapes de vos cérémonies.
+          </p>
+        </div>
+        <label className="cursor-pointer rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink hover:bg-gold-dim">
+          {importing ? 'Import…' : '+ Importer des musiques'}
+          <input
+            ref={fileInput}
+            type="file"
+            accept="audio/*"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+        </label>
+      </div>
+
+      {tracks.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-line p-12 text-center text-muted">
+          Aucune musique importée pour le moment.
+        </div>
+      ) : (
+        <ul className="divide-y divide-line rounded-lg border border-line bg-panel">
+          {tracks.map((t) => (
+            <li key={t.id} className="flex items-center gap-4 px-4 py-3">
+              <button
+                onClick={() => togglePlay(t)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gold-dim text-gold hover:bg-panel-2"
+              >
+                {playingId === t.id ? '❚❚' : '▶'}
+              </button>
+              <input
+                defaultValue={t.name}
+                onBlur={(e) => rename(t, e.target.value)}
+                className="flex-1 bg-transparent text-sm text-fg outline-none focus:underline"
+              />
+              <span className="text-xs text-muted">{formatDuration(t.duration)}</span>
+              <button
+                onClick={() => remove(t)}
+                className="text-xs text-muted hover:text-danger"
+              >
+                Supprimer
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
