@@ -199,17 +199,6 @@ export default function LiveMode() {
   }, [slidesPlaying, ceremony, slidePhotos.length])
 
   // --- Projector sync ---
-  useEffect(() => {
-    if (!id) return
-    const channel = new BroadcastChannel(channelNameFor(id))
-    channel.onmessage = (ev: MessageEvent<ProjectorMessage>) => {
-      if (ev.data.type === 'ready') sendProjectorState()
-    }
-    channelRef.current = channel
-    return () => channel.close()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
-
   function sendProjectorState() {
     if (!ceremony || !channelRef.current) return
     channelRef.current.postMessage({
@@ -220,6 +209,26 @@ export default function LiveMode() {
       playing: slidesPlaying,
     } satisfies ProjectorMessage)
   }
+
+  // Le gestionnaire de messages du BroadcastChannel n'est branché qu'une fois (voir
+  // effet ci-dessous) : il doit passer par cette ref pour toujours appeler la version
+  // la plus à jour de sendProjectorState, sinon il resterait figé sur le rendu initial
+  // (où la cérémonie n'est pas encore chargée) et ne répondrait jamais au signal "ready"
+  // envoyé par la fenêtre de projection à son ouverture.
+  const sendProjectorStateRef = useRef(sendProjectorState)
+  useEffect(() => {
+    sendProjectorStateRef.current = sendProjectorState
+  })
+
+  useEffect(() => {
+    if (!id) return
+    const channel = new BroadcastChannel(channelNameFor(id))
+    channel.onmessage = (ev: MessageEvent<ProjectorMessage>) => {
+      if (ev.data.type === 'ready') sendProjectorStateRef.current()
+    }
+    channelRef.current = channel
+    return () => channel.close()
+  }, [id])
 
   useEffect(() => {
     sendProjectorState()
@@ -281,6 +290,7 @@ export default function LiveMode() {
           )}
           <button
             onClick={openProjector}
+            title="Ouvre une fenêtre à faire glisser sur l'écran externe (TV/vidéoprojecteur branché en HDMI, ou via un cast Chromecast/AirPlay), puis à passer en plein écran depuis cette fenêtre."
             className="rounded-md border border-gold-dim px-3 py-1.5 text-sm text-gold hover:bg-panel-2"
           >
             🖥 Ouvrir la projection

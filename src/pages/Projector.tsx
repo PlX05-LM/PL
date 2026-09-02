@@ -15,7 +15,10 @@ export default function Projector() {
   const [index, setIndex] = useState(0)
   const [black, setBlack] = useState(false)
   const [connected, setConnected] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showControls, setShowControls] = useState(true)
   const urlsRef = useRef<string[]>([])
+  const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -49,15 +52,58 @@ export default function Projector() {
     document.title = 'Diaporama — Projection'
   }, [])
 
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen()
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {})
+    }
+  }
+
+  function bumpControlsVisibility() {
+    setShowControls(true)
+    if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current)
+    hideControlsTimer.current = setTimeout(() => setShowControls(false), 3000)
+  }
+
+  useEffect(() => {
+    bumpControlsVisibility()
+    return () => {
+      if (hideControlsTimer.current) clearTimeout(hideControlsTimer.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const transitionMs = (config?.transitionDuration ?? 1) * 1000
 
   return (
-    <div className="fixed inset-0 h-screen w-screen overflow-hidden bg-black">
+    <div
+      className={`fixed inset-0 h-screen w-screen overflow-hidden bg-black ${
+        showControls ? '' : 'cursor-none'
+      }`}
+      onMouseMove={bumpControlsVisibility}
+      onDoubleClick={toggleFullscreen}
+    >
       {!connected && (
         <div className="flex h-full w-full items-center justify-center text-lg text-zinc-500">
           En attente de la régie…
         </div>
       )}
+
+      <button
+        onClick={toggleFullscreen}
+        className={`absolute bottom-4 right-4 z-10 rounded-md border border-white/20 bg-black/60 px-3 py-2 text-xs text-white/80 backdrop-blur transition-opacity hover:opacity-100 ${
+          showControls ? 'opacity-70' : 'pointer-events-none opacity-0'
+        }`}
+      >
+        {isFullscreen ? '⤢ Quitter le plein écran' : '⛶ Plein écran'}
+      </button>
 
       {connected &&
         slides.map((s, i) => (
