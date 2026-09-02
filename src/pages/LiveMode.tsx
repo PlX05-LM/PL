@@ -91,6 +91,9 @@ export default function LiveMode() {
   // --- Elapsed time chrono ---
   useEffect(() => {
     if (startedAt === null) return
+    // Calcul immédiat pour éviter un flash à 00:00 avant le premier tick — utile
+    // en particulier juste après une reprise, où startedAt vient d'être restauré.
+    setElapsed((Date.now() - startedAt) / 1000)
     const t = setInterval(() => setElapsed((Date.now() - startedAt) / 1000), 500)
     return () => clearInterval(t)
   }, [startedAt])
