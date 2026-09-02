@@ -30,6 +30,7 @@ export default function Dashboard() {
   const ceremonies =
     useLiveQuery(() => db.ceremonies.orderBy('date').reverse().toArray(), []) ??
     ([] as Ceremony[])
+  const tracks = useLiveQuery(() => db.tracks.toArray(), []) ?? []
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
 
@@ -44,6 +45,11 @@ export default function Dashboard() {
   async function handleDelete(id: string) {
     if (!confirm('Supprimer définitivement cette cérémonie ?')) return
     await db.ceremonies.delete(id)
+  }
+
+  async function handleExportPdf(c: Ceremony) {
+    const { exportCeremonyPdf } = await import('../lib/exportPdf')
+    exportCeremonyPdf(c, tracks)
   }
 
   return (
@@ -94,6 +100,13 @@ export default function Dashboard() {
                 </p>
               </button>
               <div className="flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
+                <button
+                  onClick={() => handleExportPdf(c)}
+                  className="rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-fg"
+                  title="Exporter le déroulé en PDF"
+                >
+                  📄 PDF
+                </button>
                 <button
                   onClick={() => navigate(`/ceremonies/${c.id}/live`)}
                   className="rounded-md border border-gold-dim px-3 py-1.5 text-xs font-medium text-gold hover:bg-panel-2"

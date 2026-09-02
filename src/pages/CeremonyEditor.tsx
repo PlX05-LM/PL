@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { newId } from '../lib/ids'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
+import { collectCeremonyTracks } from '../lib/ceremonyTracks'
 import type {
   Ceremony,
   CeremonySegment,
@@ -103,6 +104,36 @@ export default function CeremonyEditor() {
     [draft?.segments],
   )
 
+  const [exportingMusic, setExportingMusic] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const usedTracks = useMemo(
+    () => (draft ? collectCeremonyTracks(draft, tracks) : []),
+    [draft, tracks],
+  )
+
+  async function handleExportPdf() {
+    if (!draft) return
+    setExportingPdf(true)
+    try {
+      const { exportCeremonyPdf } = await import('../lib/exportPdf')
+      exportCeremonyPdf(draft, tracks)
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
+  async function handleExportMusic() {
+    if (!draft) return
+    setExportingMusic(true)
+    try {
+      const { exportCeremonyMusicZip } = await import('../lib/exportMusic')
+      const ok = await exportCeremonyMusicZip(draft, tracks)
+      if (!ok) alert('Aucune musique n\'est encore associée à cette cérémonie.')
+    } finally {
+      setExportingMusic(false)
+    }
+  }
+
   if (!draft) {
     return <div className="p-10 text-muted">Chargement…</div>
   }
@@ -113,12 +144,30 @@ export default function CeremonyEditor() {
         <button onClick={() => navigate('/')} className="text-sm text-muted hover:text-fg">
           ← Retour aux cérémonies
         </button>
-        <button
-          onClick={() => navigate(`/ceremonies/${draft.id}/live`)}
-          className="rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink hover:bg-gold-dim"
-        >
-          ▶ Démarrer la régie live
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportPdf}
+            disabled={exportingPdf}
+            className="rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg disabled:opacity-40"
+            title="Exporter le déroulé complet en PDF (à imprimer ou partager)"
+          >
+            {exportingPdf ? 'Génération…' : '📄 Exporter en PDF'}
+          </button>
+          <button
+            onClick={handleExportMusic}
+            disabled={exportingMusic || usedTracks.length === 0}
+            className="rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg disabled:opacity-40"
+            title="Exporter les musiques de la cérémonie dans un fichier ZIP (pour la sono du lieu)"
+          >
+            {exportingMusic ? 'Préparation du ZIP…' : `🎵 Exporter la musique (${usedTracks.length})`}
+          </button>
+          <button
+            onClick={() => navigate(`/ceremonies/${draft.id}/live`)}
+            className="rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink hover:bg-gold-dim"
+          >
+            ▶ Démarrer la régie live
+          </button>
+        </div>
       </div>
 
       <input
