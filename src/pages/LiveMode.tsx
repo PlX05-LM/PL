@@ -69,6 +69,9 @@ export default function LiveMode() {
   const [keymap, setKeymap] = useState<Keymap>(() => loadKeymap())
   const [showRemoteSettings, setShowRemoteSettings] = useState(false)
 
+  const [musicTab, setMusicTab] = useState<'player' | 'library'>('player')
+  const [musicSearch, setMusicSearch] = useState('')
+
   const segments = ceremony?.segments ?? []
   const currentSegment = segments[segmentIndex]
 
@@ -76,6 +79,13 @@ export default function LiveMode() {
     () => (startedAt !== null ? computePace(segments, segmentIndex, elapsed) : null),
     [segments, segmentIndex, elapsed, startedAt],
   )
+
+  const libraryTracks = useMemo(() => {
+    const q = musicSearch.trim().toLowerCase()
+    return [...tracks]
+      .filter((t) => t.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [tracks, musicSearch])
 
   const slidePhotos = useMemo(() => {
     if (!ceremony) return []
@@ -191,6 +201,12 @@ export default function LiveMode() {
       setAudioSink(audio, selectedSinkId).catch(() => {})
     }
     setManualTrackId(trackId)
+  }
+
+  function loadAndPlayTrack(trackId: string) {
+    loadTrack(trackId)
+    audioRef.current?.play()
+    setIsPlaying(true)
   }
 
   // --- Sortie audio (enceinte Bluetooth, système son de la salle, AirPlay...) ---
@@ -566,20 +582,76 @@ export default function LiveMode() {
         {/* Musique + diaporama */}
         <aside className="flex flex-col gap-6 overflow-y-auto border-l border-line bg-panel p-4">
           <div>
-            <h2 className="mb-2 text-xs uppercase tracking-wide text-muted">Musique</h2>
-            <select
-              value={activeTrackId}
-              onChange={(e) => loadTrack(e.target.value)}
-              className="w-full rounded-md border border-line bg-panel-2 px-2 py-2 text-sm text-fg outline-none focus:border-gold-dim"
-            >
-              <option value="">— Choisir une musique —</option>
-              {tracks.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            {activeTrack && (
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-xs uppercase tracking-wide text-muted">Musique</h2>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setMusicTab('player')}
+                  className={`rounded px-2 py-0.5 text-[11px] ${
+                    musicTab === 'player' ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
+                  }`}
+                >
+                  Lecteur
+                </button>
+                <button
+                  onClick={() => setMusicTab('library')}
+                  className={`rounded px-2 py-0.5 text-[11px] ${
+                    musicTab === 'library' ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
+                  }`}
+                >
+                  Bibliothèque ({tracks.length})
+                </button>
+              </div>
+            </div>
+
+            {musicTab === 'library' && (
+              <div>
+                <input
+                  value={musicSearch}
+                  onChange={(e) => setMusicSearch(e.target.value)}
+                  placeholder="Rechercher une musique…"
+                  className="mb-2 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-sm text-fg outline-none focus:border-gold-dim"
+                />
+                <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
+                  {libraryTracks.length === 0 && (
+                    <p className="py-4 text-center text-xs text-muted">Aucune musique trouvée.</p>
+                  )}
+                  {libraryTracks.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => loadAndPlayTrack(t.id)}
+                      className={`flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors ${
+                        activeTrackId === t.id
+                          ? 'border-gold-dim bg-panel-2 text-gold'
+                          : 'border-line text-fg hover:bg-panel-2'
+                      }`}
+                    >
+                      <span className="truncate">
+                        {activeTrackId === t.id && isPlaying ? '▶ ' : ''}
+                        {t.name}
+                      </span>
+                      <span className="shrink-0 font-mono text-muted">{formatClock(t.duration ?? NaN)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {musicTab === 'player' && (
+              <>
+                <select
+                  value={activeTrackId}
+                  onChange={(e) => loadTrack(e.target.value)}
+                  className="w-full rounded-md border border-line bg-panel-2 px-2 py-2 text-sm text-fg outline-none focus:border-gold-dim"
+                >
+                  <option value="">— Choisir une musique —</option>
+                  {tracks.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                {activeTrack && (
               <div className="mt-3 rounded-md border border-line bg-panel-2 p-3">
                 <p className="mb-2 truncate text-sm text-fg">{activeTrack.name}</p>
                 <div className="mb-2 flex items-center gap-2">
@@ -662,6 +734,8 @@ export default function LiveMode() {
                     : "Ouvre le sélecteur système du navigateur pour choisir la sortie audio (AirPlay, Bluetooth)."}
                 </p>
               </div>
+            )}
+              </>
             )}
           </div>
 
