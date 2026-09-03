@@ -8,6 +8,14 @@ import { resolveAudioDuration } from '../lib/audioDuration'
 import { computePace, paceLabel } from '../lib/pace'
 import { loadKeymap, normalizeKey, saveKeymap, type Keymap, type RemoteAction } from '../lib/remoteControl'
 import RemoteControlSettings from '../components/RemoteControlSettings'
+import {
+  isAudioOutputSelectionSupported,
+  listAudioOutputDevices,
+  loadPreferredSink,
+  savePreferredSink,
+  setAudioSink,
+  unlockDeviceLabels,
+} from '../lib/audioOutput'
 
 function formatClock(sec: number) {
   if (!Number.isFinite(sec)) return '--:--'
@@ -36,6 +44,11 @@ export default function LiveMode() {
   const [duration, setDuration] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioUrlRef = useRef<string | null>(null)
+
+  const audioOutputSupported = useMemo(() => isAudioOutputSelectionSupported(), [])
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedSinkId, setSelectedSinkId] = useState<string>(() => loadPreferredSink() ?? '')
+  const [detectingDevices, setDetectingDevices] = useState(false)
 
   const [slideIndex, setSlideIndex] = useState(0)
   const [slidesPlaying, setSlidesPlaying] = useState(false)
@@ -163,7 +176,33 @@ export default function LiveMode() {
     audio.onloadedmetadata = () => {
       resolveAudioDuration(audio).then(setDuration)
     }
+    if (selectedSinkId) setAudioSink(audio, selectedSinkId).catch(() => {})
     setManualTrackId(trackId)
+  }
+
+  // --- Sortie audio (enceinte Bluetooth, système son de la salle...) ---
+  useEffect(() => {
+    if (!audioOutputSupported) return
+    listAudioOutputDevices().then(setAudioDevices).catch(() => {})
+  }, [audioOutputSupported])
+
+  async function detectAudioDevices() {
+    setDetectingDevices(true)
+    try {
+      await unlockDeviceLabels()
+      const devices = await listAudioOutputDevices()
+      setAudioDevices(devices)
+    } finally {
+      setDetectingDevices(false)
+    }
+  }
+
+  async function selectAudioOutput(deviceId: string) {
+    setSelectedSinkId(deviceId)
+    savePreferredSink(deviceId)
+    if (audioRef.current) {
+      await setAudioSink(audioRef.current, deviceId).catch(() => {})
+    }
   }
 
   function togglePlay() {
@@ -556,6 +595,36 @@ export default function LiveMode() {
                   }}
                   className="w-full"
                 />
+              </div>
+            )}
+            {audioOutputSupported && (
+              <div className="mt-3">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-xs text-muted">Sortie audio</span>
+                  <button
+                    onClick={detectAudioDevices}
+                    disabled={detectingDevices}
+                    className="rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-fg disabled:opacity-50"
+                  >
+                    {detectingDevices ? '…' : '🔄 Détecter'}
+                  </button>
+                </div>
+                <select
+                  value={selectedSinkId}
+                  onChange={(e) => selectAudioOutput(e.target.value)}
+                  className="w-full rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
+                >
+                  <option value="">Par défaut</option>
+                  {audioDevices.map((d, i) => (
+                    <option key={d.deviceId || i} value={d.deviceId}>
+                      {d.label || `Sortie ${i + 1}`}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[10px] text-muted">
+                  Enceinte Bluetooth, TV, système son… « Détecter » demande une
+                  autorisation micro (jamais utilisée) pour afficher les noms.
+                </p>
               </div>
             )}
           </div>
