@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Clé privée de signature des licences (scripts/generate-license-key.mjs) —
+# NE JAMAIS committer : elle permet de fabriquer des clés d'activation valides.
+license-private-key.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

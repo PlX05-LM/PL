@@ -14,6 +14,7 @@ Application web (PC et tablette) pensée pour les maîtres de cérémonie du fun
 - **Fonctionne hors-ligne** : toutes les données (cérémonies, musiques, photos) sont stockées localement dans le navigateur (IndexedDB) — aucune connexion internet requise le jour de la cérémonie.
 - **Sauvegarde** : export/import d'une sauvegarde complète (ZIP) de toutes les cérémonies, musiques et photos, à conserver ailleurs que sur l'appareil.
 - **Application installable (PWA)** : à installer sur l'écran d'accueil d'une tablette ou d'un PC comme une vraie application, avec mise en cache de l'appli pour un chargement garanti même sans réseau.
+- **Accès protégé par licence** : l'application est verrouillée tant qu'une clé d'activation valide n'a pas été saisie ; chaque poste choisit ensuite son identifiant et son mot de passe (plusieurs identifiants possibles par licence, selon le nombre de postes vendus). Voir « Licences et activation » ci-dessous.
 
 ## Démarrer en développement
 
@@ -38,6 +39,35 @@ automatiquement l'application sur GitHub Pages à chaque push. L'appli est servi
 
 Si Pages n'est pas encore activé sur le dépôt, une seule manipulation ponctuelle est
 nécessaire : Settings → Pages → Build and deployment → Source → **GitHub Actions**.
+
+## Licences et activation
+
+L'application est verrouillée par une clé d'activation cryptographiquement
+signée (ECDSA P-256) — pas de serveur, pas d'abonnement à héberger : la
+vérification se fait entièrement dans le navigateur du client, hors-ligne
+comme le reste de l'app.
+
+Pour vendre une licence à un client :
+
+```bash
+node scripts/generate-license-key.mjs "Pompes Funèbres Dupont" 3
+```
+
+(nom du client, puis nombre de postes/identifiants inclus dans la licence —
+1 par défaut). La première exécution génère une paire de clés :
+- `license-private-key.json` — la clé privée, créée à la racine du projet et
+  **jamais committée** (dans `.gitignore`). C'est elle qui permet de signer
+  de nouvelles clés d'activation : à conserver précieusement, en dehors du
+  dépôt (elle n'a été communiquée qu'une fois, lors de la création).
+- la clé publique correspondante, intégrée dans
+  `src/lib/licensing/publicKey.ts` et committée normalement — elle ne permet
+  que de *vérifier* une clé, jamais d'en fabriquer.
+
+Le script affiche ensuite la clé d'activation à transmettre au client. Celui-ci
+la saisit une fois dans l'application, puis choisit son identifiant et son mot
+de passe (stockés localement, mot de passe jamais en clair). Si la licence
+inclut plusieurs postes, chaque personne de l'agence peut créer son propre
+identifiant depuis l'écran de connexion, jusqu'à la limite achetée.
 
 ## Stack technique
 

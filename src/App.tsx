@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import AppShell from './components/AppShell'
+import AccessGate from './components/AccessGate'
 import Dashboard from './pages/Dashboard'
 import CeremonyEditor from './pages/CeremonyEditor'
 import MusicLibrary from './pages/MusicLibrary'
@@ -11,7 +12,7 @@ import PwaUpdatePrompt from './components/PwaUpdatePrompt'
 
 export default function App() {
   return (
-    <>
+    <AccessGate>
       <Routes>
         <Route path="/projector/:id" element={<Projector />} />
         <Route path="/ceremonies/:id/live" element={<LiveMode />} />
@@ -24,6 +25,6 @@ export default function App() {
         </Route>
       </Routes>
       <PwaUpdatePrompt />
-    </>
+    </AccessGate>
   )
 }

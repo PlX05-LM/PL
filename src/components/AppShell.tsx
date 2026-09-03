@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useInstallPrompt } from '../lib/useInstallPrompt'
+import { clearSession, loadSession } from '../lib/licensing/store'
 
 const navItems = [
   { to: '/', label: 'Cérémonies', icon: '🕊️', end: true },
@@ -8,8 +9,14 @@ const navItems = [
   { to: '/sauvegarde', label: 'Sauvegarde', icon: '⤓' },
 ]
 
+function handleLogout() {
+  clearSession()
+  window.location.reload()
+}
+
 export default function AppShell() {
   const { canInstall, showIosHint, promptInstall } = useInstallPrompt()
+  const session = loadSession()
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-ink text-fg">
@@ -54,6 +61,16 @@ export default function AppShell() {
           <p className="text-xs text-muted">
             Fonctionne hors-ligne · données stockées sur cet appareil
           </p>
+          {session && (
+            <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+              <span className="truncate text-xs text-muted" title={session.username}>
+                👤 {session.username}
+              </span>
+              <button onClick={handleLogout} className="text-xs text-muted hover:text-fg">
+                Déconnexion
+              </button>
+            </div>
+          )}
         </div>
       </aside>
       <main className="flex-1 overflow-y-auto">
