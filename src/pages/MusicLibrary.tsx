@@ -41,6 +41,16 @@ export default function MusicLibrary() {
     }
   }
 
+  async function handleRegenerateBuiltInLibrary() {
+    setBuiltInProgress({ index: 0, total: 20, title: '' })
+    try {
+      const { regenerateBuiltInLibrary } = await import('../lib/royaltyFreeMusic')
+      await regenerateBuiltInLibrary((p) => setBuiltInProgress(p))
+    } finally {
+      setBuiltInProgress(null)
+    }
+  }
+
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
     setImporting(true)
@@ -125,17 +135,24 @@ export default function MusicLibrary() {
               de droit, utilisables sans restriction dans un cadre professionnel.
             </p>
           </div>
-          <button
-            onClick={handleImportBuiltInLibrary}
-            disabled={!!builtInProgress || hasBuiltInLibrary}
-            className="shrink-0 rounded-md border border-gold-dim px-4 py-2 text-sm font-medium text-gold hover:bg-panel-2 disabled:opacity-50"
-          >
-            {builtInProgress
-              ? `Génération… ${builtInProgress.index}/${builtInProgress.total}`
-              : hasBuiltInLibrary
-                ? '✓ Ajoutée à la bibliothèque'
-                : '+ Ajouter les 20 musiques'}
-          </button>
+          <div className="shrink-0 text-right">
+            <button
+              onClick={hasBuiltInLibrary ? handleRegenerateBuiltInLibrary : handleImportBuiltInLibrary}
+              disabled={!!builtInProgress}
+              className="rounded-md border border-gold-dim px-4 py-2 text-sm font-medium text-gold hover:bg-panel-2 disabled:opacity-50"
+            >
+              {builtInProgress
+                ? `Génération… ${builtInProgress.index}/${builtInProgress.total}`
+                : hasBuiltInLibrary
+                  ? '🔄 Régénérer les sonorités'
+                  : '+ Ajouter les 20 musiques'}
+            </button>
+            {hasBuiltInLibrary && !builtInProgress && (
+              <p className="mt-1 text-xs text-muted">
+                Remplace l'audio des 20 pistes (mêmes noms, mêmes affectations).
+              </p>
+            )}
+          </div>
         </div>
       </div>
 

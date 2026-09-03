@@ -5,7 +5,7 @@ Application web (PC et tablette) pensée pour les maîtres de cérémonie du fun
 ## Fonctionnalités
 
 - **Cérémonies** : fiche défunt/famille, type de cérémonie, date/lieu, et un déroulé (timeline) découpé en étapes avec un texte à lire pour chacune.
-- **Bibliothèque musicale** : import de fichiers audio (MP3, WAV, M4A…), prévisualisation, assignation d'un morceau par étape.
+- **Bibliothèque musicale** : import de fichiers audio (MP3, WAV, M4A…), prévisualisation, assignation d'un morceau par étape. Inclut 20 compositions originales libres de droit, réparties en 9 sonorités bien distinctes (orgue, cordes, voix, violoncelle seul, harpe, piano, flûte, carillon) pour éviter que les morceaux ne se ressemblent.
 - **Photothèque & diaporama** : import de photos, sélection et ordre pour le diaporama, réglages de transition (fondu, dissolution, glissement, cut), durée par photo, effet Ken Burns, lecture en boucle.
 - **Régie live** : écran plein cadre pour le jour de la cérémonie — déroulé cliquable, prompteur (défilement automatique réglable, taille de texte, texte modifiable en direct), lecteur audio avec fondu de sortie et choix de la sortie audio (enceinte Bluetooth, système son de la salle, AirPlay), contrôle du diaporama, chronomètre, compteur d'avance/retard sur le déroulé prévu. Le sélecteur de sortie audio s'adapte automatiquement à l'appareil : menu déroulant direct sur Chrome/Edge/Android, bouton AirPlay natif sur iPhone/iPad/Safari.
 - **Textes-types** : bibliothèque de textes prêts à l'emploi (ouverture, transitions, hommage, clôture, pensées laïques, repères pour lectures religieuses) à insérer dans une étape.
