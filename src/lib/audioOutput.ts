@@ -3,16 +3,67 @@ type SinkCapableElement = HTMLMediaElement & {
   sinkId?: string
 }
 
+type AirplayCapableElement = HTMLMediaElement & {
+  webkitShowPlaybackTargetPicker?: () => void
+  webkitCurrentPlaybackTargetIsWireless?: boolean
+}
+
+export type AudioOutputCapability = 'sink-select' | 'airplay' | 'none'
+
 /**
- * Le choix de la sortie audio (setSinkId) n'est disponible que sur les
- * navigateurs basés sur Chromium (Chrome, Edge, navigateurs Android...).
- * Safari (donc iPad) ne l'implémente pas : on masque le sélecteur plutôt
- * que d'afficher un contrôle qui ne ferait rien.
+ * Détermine quel mécanisme de choix de sortie audio utiliser :
+ * - « sink-select » : setSinkId, disponible sur les navigateurs Chromium
+ *   (Chrome, Edge, y compris sur Android) — permet un choix direct dans un
+ *   menu déroulant, avec la liste des périphériques.
+ * - « airplay » : WebKit (Safari — iPhone/iPad/Mac, et tout navigateur sous
+ *   iOS/iPadOS puisqu'Apple impose le moteur WebKit) n'implémente pas
+ *   setSinkId, mais expose le sélecteur système AirPlay, qui liste aussi les
+ *   enceintes Bluetooth déjà appairées.
+ * - « none » : aucun des deux (navigateur trop ancien, Firefox desktop...) —
+ *   on masque le contrôle plutôt que d'afficher quelque chose d'inopérant.
  */
-export function isAudioOutputSelectionSupported(): boolean {
-  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return false
-  const proto = window.HTMLMediaElement?.prototype as SinkCapableElement | undefined
-  return typeof proto?.setSinkId === 'function'
+export function detectAudioOutputCapability(): AudioOutputCapability {
+  if (typeof window === 'undefined') return 'none'
+  const proto = window.HTMLMediaElement?.prototype as
+    | (SinkCapableElement & AirplayCapableElement)
+    | undefined
+  if (typeof proto?.setSinkId === 'function' && navigator.mediaDevices) {
+    return 'sink-select'
+  }
+  if (typeof proto?.webkitShowPlaybackTargetPicker === 'function') return 'airplay'
+  return 'none'
+}
+
+export function showAirPlayPicker(audio: HTMLAudioElement): void {
+  const el = audio as AirplayCapableElement
+  el.webkitShowPlaybackTargetPicker?.()
+}
+
+function isWirelessPlaybackTarget(audio: HTMLAudioElement): boolean {
+  return Boolean((audio as AirplayCapableElement).webkitCurrentPlaybackTargetIsWireless)
+}
+
+/** S'abonne aux changements de sortie AirPlay/Bluetooth d'un élément audio. */
+export function onWirelessPlaybackTargetChange(
+  audio: HTMLAudioElement,
+  cb: (isWireless: boolean) => void,
+): () => void {
+  const handler = () => cb(isWirelessPlaybackTarget(audio))
+  audio.addEventListener('webkitcurrentplaybacktargetiswirelesschanged', handler)
+  return () => audio.removeEventListener('webkitcurrentplaybacktargetiswirelesschanged', handler)
+}
+
+/**
+ * Détecte un appareil Apple (iPhone/iPad/iPod, et Mac tactile — l'iPadOS 13+
+ * se présente comme « Macintosh » mais garde plusieurs points de contact,
+ * contrairement à un vrai Mac). Sert uniquement à adapter les libellés
+ * affichés ; le choix du mécanisme (sink-select/airplay) repose lui sur la
+ * détection de fonctionnalité ci-dessus, plus fiable qu'un sniff de plateforme.
+ */
+export function isApplePlatform(): boolean {
+  if (typeof navigator === 'undefined') return false
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) return true
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
 }
 
 export async function listAudioOutputDevices(): Promise<MediaDeviceInfo[]> {

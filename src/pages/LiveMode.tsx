@@ -9,11 +9,14 @@ import { computePace, paceLabel } from '../lib/pace'
 import { loadKeymap, normalizeKey, saveKeymap, type Keymap, type RemoteAction } from '../lib/remoteControl'
 import RemoteControlSettings from '../components/RemoteControlSettings'
 import {
-  isAudioOutputSelectionSupported,
+  detectAudioOutputCapability,
+  isApplePlatform,
   listAudioOutputDevices,
   loadPreferredSink,
+  onWirelessPlaybackTargetChange,
   savePreferredSink,
   setAudioSink,
+  showAirPlayPicker,
   unlockDeviceLabels,
 } from '../lib/audioOutput'
 
@@ -45,10 +48,11 @@ export default function LiveMode() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioUrlRef = useRef<string | null>(null)
 
-  const audioOutputSupported = useMemo(() => isAudioOutputSelectionSupported(), [])
+  const audioOutputCapability = useMemo(() => detectAudioOutputCapability(), [])
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
   const [selectedSinkId, setSelectedSinkId] = useState<string>(() => loadPreferredSink() ?? '')
   const [detectingDevices, setDetectingDevices] = useState(false)
+  const [airplayActive, setAirplayActive] = useState(false)
 
   const [slideIndex, setSlideIndex] = useState(0)
   const [slidesPlaying, setSlidesPlaying] = useState(false)
@@ -161,14 +165,21 @@ export default function LiveMode() {
   const activeTrackId = manualTrackId || currentSegment?.trackId || ''
   const activeTrack = tracks.find((t) => t.id === activeTrackId)
 
+  function ensureAudioElement(): HTMLAudioElement {
+    if (!audioRef.current) {
+      audioRef.current = new Audio()
+      onWirelessPlaybackTargetChange(audioRef.current, setAirplayActive)
+    }
+    return audioRef.current
+  }
+
   function loadTrack(trackId: string) {
     const track = tracks.find((t) => t.id === trackId)
     if (!track) return
     if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
     const url = URL.createObjectURL(track.blob)
     audioUrlRef.current = url
-    if (!audioRef.current) audioRef.current = new Audio()
-    const audio = audioRef.current
+    const audio = ensureAudioElement()
     audio.src = url
     audio.volume = volume
     audio.onended = () => setIsPlaying(false)
@@ -176,15 +187,17 @@ export default function LiveMode() {
     audio.onloadedmetadata = () => {
       resolveAudioDuration(audio).then(setDuration)
     }
-    if (selectedSinkId) setAudioSink(audio, selectedSinkId).catch(() => {})
+    if (audioOutputCapability === 'sink-select' && selectedSinkId) {
+      setAudioSink(audio, selectedSinkId).catch(() => {})
+    }
     setManualTrackId(trackId)
   }
 
-  // --- Sortie audio (enceinte Bluetooth, système son de la salle...) ---
+  // --- Sortie audio (enceinte Bluetooth, système son de la salle, AirPlay...) ---
   useEffect(() => {
-    if (!audioOutputSupported) return
+    if (audioOutputCapability !== 'sink-select') return
     listAudioOutputDevices().then(setAudioDevices).catch(() => {})
-  }, [audioOutputSupported])
+  }, [audioOutputCapability])
 
   async function detectAudioDevices() {
     setDetectingDevices(true)
@@ -203,6 +216,10 @@ export default function LiveMode() {
     if (audioRef.current) {
       await setAudioSink(audioRef.current, deviceId).catch(() => {})
     }
+  }
+
+  function openAirPlayPicker() {
+    showAirPlayPicker(ensureAudioElement())
   }
 
   function togglePlay() {
@@ -597,7 +614,7 @@ export default function LiveMode() {
                 />
               </div>
             )}
-            {audioOutputSupported && (
+            {audioOutputCapability === 'sink-select' && (
               <div className="mt-3">
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-xs text-muted">Sortie audio</span>
@@ -624,6 +641,25 @@ export default function LiveMode() {
                 <p className="mt-1 text-[10px] text-muted">
                   Enceinte Bluetooth, TV, système son… « Détecter » demande une
                   autorisation micro (jamais utilisée) pour afficher les noms.
+                </p>
+              </div>
+            )}
+            {audioOutputCapability === 'airplay' && (
+              <div className="mt-3">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-xs text-muted">Sortie audio</span>
+                  {airplayActive && <span className="text-[10px] text-gold">● Connecté</span>}
+                </div>
+                <button
+                  onClick={openAirPlayPicker}
+                  className="w-full rounded-md border border-gold-dim px-2 py-1.5 text-xs text-gold hover:bg-panel"
+                >
+                  📡 AirPlay / Bluetooth…
+                </button>
+                <p className="mt-1 text-[10px] text-muted">
+                  {isApplePlatform()
+                    ? "Ouvre le sélecteur système d'iPhone/iPad : enceintes AirPlay et Bluetooth déjà appairées."
+                    : "Ouvre le sélecteur système du navigateur pour choisir la sortie audio (AirPlay, Bluetooth)."}
                 </p>
               </div>
             )}
