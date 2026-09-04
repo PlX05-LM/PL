@@ -8,6 +8,7 @@ import { collectCeremonyTracks } from '../lib/ceremonyTracks'
 import { isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
 import TextLibraryModal from '../components/TextLibraryModal'
 import PoemLibraryModal from '../components/PoemLibraryModal'
+import CitationLibraryModal from '../components/CitationLibraryModal'
 import type {
   Ceremony,
   CeremonySegment,
@@ -103,6 +104,7 @@ export default function CeremonyEditor() {
 
   const [textLibraryForSegment, setTextLibraryForSegment] = useState<string | null>(null)
   const [poemLibraryForSegment, setPoemLibraryForSegment] = useState<string | null>(null)
+  const [citationLibraryForSegment, setCitationLibraryForSegment] = useState<string | null>(null)
 
   function insertText(segId: string, text: string) {
     if (!draft) return
@@ -112,6 +114,7 @@ export default function CeremonyEditor() {
     updateSegment(segId, { script })
     setTextLibraryForSegment(null)
     setPoemLibraryForSegment(null)
+    setCitationLibraryForSegment(null)
   }
 
   function togglePhoto(photoId: string) {
@@ -358,6 +361,13 @@ export default function CeremonyEditor() {
                       >
                         📜 Poème
                       </button>
+                      <button
+                        onClick={() => setCitationLibraryForSegment(seg.id)}
+                        title="Insérer une citation de livre (classées par situation de deuil)"
+                        className="whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+                      >
+                        💬 Citation
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -521,6 +531,13 @@ export default function CeremonyEditor() {
         <PoemLibraryModal
           onInsert={(text) => insertText(poemLibraryForSegment, text)}
           onClose={() => setPoemLibraryForSegment(null)}
+        />
+      )}
+
+      {citationLibraryForSegment && (
+        <CitationLibraryModal
+          onInsert={(text) => insertText(citationLibraryForSegment, text)}
+          onClose={() => setCitationLibraryForSegment(null)}
         />
       )}
     </div>

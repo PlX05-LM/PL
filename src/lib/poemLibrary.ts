@@ -1,12 +1,6 @@
-export type PoemCategory =
-  | 'deuil-general'
-  | 'mort-jeune'
-  | 'deuil-perinatal'
-  | 'mort-accidentelle-brutale'
-  | 'apres-suicide'
-  | 'vieillesse-paix'
-  | 'amour-separation'
-  | 'classiques'
+import { griefCategoryLabels, griefCategoryOrder, type GriefCategory } from './griefCategories'
+
+export type PoemCategory = GriefCategory
 
 export interface PoemEntry {
   id: string
@@ -21,27 +15,8 @@ export interface PoemEntry {
   note: string
 }
 
-export const poemCategoryLabels: Record<PoemCategory, string> = {
-  'deuil-general': 'Deuil / hommage général',
-  'mort-jeune': "Mort d'un enfant ou d'une personne jeune",
-  'deuil-perinatal': 'Deuil périnatal / enfant mort-né',
-  'mort-accidentelle-brutale': 'Mort brutale ou accidentelle',
-  'apres-suicide': 'Après un suicide (délicatesse requise)',
-  'vieillesse-paix': 'Grand âge / mort paisible',
-  'amour-separation': "Séparation, perte d'un être aimé",
-  classiques: 'Grands classiques',
-}
-
-export const poemCategoryOrder: PoemCategory[] = [
-  'deuil-general',
-  'mort-jeune',
-  'deuil-perinatal',
-  'mort-accidentelle-brutale',
-  'apres-suicide',
-  'vieillesse-paix',
-  'amour-separation',
-  'classiques',
-]
+export const poemCategoryLabels = griefCategoryLabels
+export const poemCategoryOrder = griefCategoryOrder
 
 export const poemLibraryDisclaimer =
   "Tous ces poèmes sont dans le domaine public (auteurs décédés depuis plus de 70 ans) : vous pouvez les lire, les imprimer et les diffuser librement, y compris dans un cadre professionnel. Les catégories et notes d'adaptation sont des suggestions — à ajuster selon la sensibilité de chaque famille, en particulier pour un deuil après un suicide ou une perte périnatale."
