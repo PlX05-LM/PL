@@ -131,6 +131,15 @@ export const poemLibrary: PoemEntry[] = [
     note: "Sonnet dense et symbolique sur une mélancolie profonde (« le Soleil noir de la Mélancolie ») ; Nerval lui-même est mort par suicide. Texte exigeant, à réserver à une famille sensible à la poésie, et à proposer avec beaucoup de délicatesse.",
   },
   {
+    id: 'scott-holland-la-mort-nest-rien',
+    title: "La mort n'est rien",
+    author: 'Henry Scott Holland',
+    authorDates: '1847–1918',
+    categories: ['deuil-general', 'vieillesse-paix', 'amour-separation'],
+    body: "La mort n'est rien.\nJe suis simplement passé dans la pièce à côté.\nJe suis moi, tu es toi.\nCe que nous étions l'un pour l'autre, nous le sommes toujours.\n\nDonne-moi le nom que tu m'as toujours donné,\nParle-moi comme tu l'as toujours fait,\nN'emploie pas un ton différent,\nNe prends pas un air solennel ou triste,\nContinue à rire de ce qui nous faisait rire ensemble,\nPrie, souris, pense à moi, prie pour moi.\n\nQue mon nom soit prononcé à la maison comme il l'a toujours été,\nSans emphase d'aucune sorte, sans une trace d'ombre.\nLa vie signifie tout ce qu'elle a toujours signifié,\nElle est ce qu'elle a toujours été.\nLe fil n'est pas coupé.\n\nPourquoi serais-je hors de tes pensées,\nSimplement parce que je suis hors de ta vue ?\nJe ne suis pas loin, juste de l'autre côté du chemin.\nTu vois, tout est bien.",
+    note: "Texte le plus demandé aux obsèques en France — souvent attribué par erreur à Charles Péguy, qui n'en est pas l'auteur. Il s'agit en réalité d'un extrait d'un sermon de 1910 du chanoine anglican Henry Scott Holland, dont la traduction française circule depuis les années 1990 sans traducteur identifié (de légères variantes de formulation existent selon les recueils). Registre doux et rassurant, adapté à la plupart des deuils, y compris pour des familles peu croyantes malgré son origine religieuse.",
+  },
+  {
     id: 'musset-tristesse',
     title: 'Tristesse',
     author: 'Alfred de Musset',
