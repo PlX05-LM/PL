@@ -54,13 +54,27 @@ export interface Biography {
   education?: string
   siblings?: string
   career?: string
+  volunteering?: string
   metSpouse?: string
   spouseName?: string
   weddingDate?: string
   hasChildren: boolean
   children: BiographyChild[]
+  grandchildren?: string
   passions?: string
+  /** Trois mots ou traits qui le/la décrivaient. */
+  characterTraits?: string
+  /** Une phrase, une expression qu'il/elle répétait souvent. */
+  sayings?: string
+  /** Un objet, un lieu, une odeur, une chanson qui évoque son souvenir. */
+  symbolicObject?: string
+  proudestOf?: string
+  guidingValue?: string
   anecdotes: string[]
+  /** Comment son conjoint, ses enfants, ses amis ou collègues le/la décriraient. */
+  lovedOnesView?: string
+  /** Le dernier mot qu'il/elle aurait pu laisser, pour clore l'éloge. */
+  legacyWish?: string
   notes?: string
 }
 

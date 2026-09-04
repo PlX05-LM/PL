@@ -21,10 +21,23 @@ function pronounLow(gender: Biography['gender']): string {
   return 'il/elle'
 }
 
+/** Pronom tonique, utilisé après une préposition (« à lui », jamais « à il »). */
+function disjunctive(gender: Biography['gender']): string {
+  if (gender === 'homme') return 'lui'
+  if (gender === 'femme') return 'elle'
+  return 'lui/elle'
+}
+
 /** Élision de « de » devant une voyelle ou un h muet : « de un ami » → « d'un ami ». */
 function deElided(text: string): string {
   const trimmed = text.trim()
   return /^[aeiouhàâéèêëîïôùûAEIOUHÀÂÉÈÊËÎÏÔÙÛ]/.test(trimmed) ? `d'${trimmed}` : `de ${trimmed}`
+}
+
+/** Garantit une ponctuation finale, pour les fragments libres qui terminent une phrase. */
+function ensureSentence(text: string): string {
+  const trimmed = text.trim()
+  return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`
 }
 
 function formatDate(iso?: string): string {
@@ -59,6 +72,7 @@ export function composeBiographyDraft(deceasedName: string, bio: Biography): str
     return name
   }
 
+  // --- Naissance, fratrie, scolarité ---
   const birthBits: string[] = []
   if (bio.birthDate) birthBits.push(`le ${formatDate(bio.birthDate)}`)
   if (bio.birthPlace) birthBits.push(`à ${bio.birthPlace}`)
@@ -74,18 +88,26 @@ export function composeBiographyDraft(deceasedName: string, bio: Biography): str
   if (bio.education?.trim()) {
     const subject = nameUsed ? pronounCap(bio.gender) : name
     nameUsed = true
-    const sentence = `${subject} ${bio.education.trim()}`
+    const sentence = `${subject} ${ensureSentence(bio.education)}`
     intro = intro ? `${intro} ${sentence}` : sentence
   }
   if (intro) paragraphs.push(intro)
 
+  // --- Vie professionnelle et engagements ---
+  const workBits: string[] = []
   if (bio.career?.trim()) {
-    paragraphs.push(`Sur le plan professionnel, ${nameUsed ? pronounLow(bio.gender) : name} ${bio.career.trim()}`)
+    workBits.push(`Sur le plan professionnel, ${nameUsed ? pronounLow(bio.gender) : name} ${ensureSentence(bio.career)}`)
     nameUsed = true
   }
+  if (bio.volunteering?.trim()) {
+    workBits.push(`${pronounCap(bio.gender)} s'investissait par ailleurs ${ensureSentence(bio.volunteering)}`)
+    nameUsed = true
+  }
+  if (workBits.length > 0) paragraphs.push(workBits.join(' '))
 
+  // --- Conjoint(e), enfants, petits-enfants ---
   const familyBits: string[] = []
-  if (bio.metSpouse?.trim()) familyBits.push(bio.metSpouse.trim())
+  if (bio.metSpouse?.trim()) familyBits.push(ensureSentence(bio.metSpouse))
   if (bio.spouseName?.trim()) {
     const weddingBit = bio.weddingDate ? ` le ${formatDate(bio.weddingDate)}` : ''
     familyBits.push(`${pronounCap(bio.gender)} a épousé ${bio.spouseName.trim()}${weddingBit}.`)
@@ -100,8 +122,12 @@ export function composeBiographyDraft(deceasedName: string, bio: Biography): str
     const verb = bio.children.length > 1 ? 'sont nés' : 'est né(e)'
     familyBits.push(`De cette union ${verb} ${joinWithAnd(names)}.`)
   }
+  if (bio.grandchildren?.trim()) {
+    familyBits.push(`${pronounCap(bio.gender)} a eu la joie de connaître ses petits-enfants : ${bio.grandchildren.trim()}.`)
+  }
   if (familyBits.length > 0) paragraphs.push(familyBits.join(' '))
 
+  // --- Passions ---
   if (bio.passions?.trim()) {
     paragraphs.push(
       `${nameUsed ? pronounCap(bio.gender) : subjectCap()} ${agree(bio.gender, 'était passionné', 'était passionnée')} par ${bio.passions.trim()}.`,
@@ -109,13 +135,44 @@ export function composeBiographyDraft(deceasedName: string, bio: Biography): str
     nameUsed = true
   }
 
-  const anecdotes = bio.anecdotes.map((a) => a.trim()).filter(Boolean)
+  // --- Portrait et personnalité ---
+  const portraitBits: string[] = []
+  if (bio.characterTraits?.trim()) {
+    portraitBits.push(`${nameUsed ? pronounCap(bio.gender) : subjectCap()} était ${bio.characterTraits.trim()}.`)
+    nameUsed = true
+  }
+  if (bio.sayings?.trim()) {
+    portraitBits.push(`${pronounCap(bio.gender)} aimait répéter : « ${bio.sayings.trim()} ».`)
+  }
+  if (bio.symbolicObject?.trim()) {
+    portraitBits.push(`Beaucoup penseront à ${disjunctive(bio.gender)} en repensant à ${bio.symbolicObject.trim()}.`)
+  }
+  if (bio.proudestOf?.trim()) {
+    portraitBits.push(`${pronounCap(bio.gender)} était ${agree(bio.gender, 'fier', 'fière')} ${deElided(bio.proudestOf)}.`)
+  }
+  if (bio.guidingValue?.trim()) {
+    portraitBits.push(`${pronounCap(bio.gender)} vivait selon un principe simple : ${bio.guidingValue.trim()}.`)
+  }
+  if (portraitBits.length > 0) paragraphs.push(portraitBits.join(' '))
+
+  // --- Anecdotes ---
+  const anecdotes = bio.anecdotes.map((a) => a.trim()).filter(Boolean).map(ensureSentence)
   if (anecdotes.length > 0) {
     paragraphs.push(anecdotes.join('\n\n'))
   }
 
+  // --- Le regard des proches ---
+  if (bio.lovedOnesView?.trim()) {
+    paragraphs.push(ensureSentence(bio.lovedOnesView))
+  }
+
+  // --- Mot de clôture ---
+  if (bio.legacyWish?.trim()) {
+    paragraphs.push(`S'il fallait retenir un dernier mot de ${name}, ce serait peut-être : « ${bio.legacyWish.trim()} ».`)
+  }
+
   if (bio.notes?.trim()) {
-    paragraphs.push(bio.notes.trim())
+    paragraphs.push(ensureSentence(bio.notes))
   }
 
   return paragraphs.join('\n\n')
@@ -128,11 +185,20 @@ export function hasAnyBiographyContent(bio: Biography): boolean {
       bio.education?.trim() ||
       bio.siblings?.trim() ||
       bio.career?.trim() ||
+      bio.volunteering?.trim() ||
       bio.metSpouse?.trim() ||
       bio.spouseName?.trim() ||
       (bio.hasChildren && bio.children.length > 0) ||
+      bio.grandchildren?.trim() ||
       bio.passions?.trim() ||
+      bio.characterTraits?.trim() ||
+      bio.sayings?.trim() ||
+      bio.symbolicObject?.trim() ||
+      bio.proudestOf?.trim() ||
+      bio.guidingValue?.trim() ||
       bio.anecdotes.some((a) => a.trim()) ||
+      bio.lovedOnesView?.trim() ||
+      bio.legacyWish?.trim() ||
       bio.notes?.trim(),
   )
 }

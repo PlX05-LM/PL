@@ -137,9 +137,12 @@ export default function Biography() {
 
       <h2 className="font-display text-3xl text-fg">Biographie</h2>
       <p className="mt-1 text-sm text-muted">
-        Recueillez auprès de la famille les informations sur {ceremony.deceasedName || 'le défunt'}{' '}
-        pour préparer l'éloge. Une ébauche de texte pourra être générée à partir de ce que vous
-        remplissez ci-dessous — à relire et personnaliser, elle ne remplace pas vos propres mots.
+        Ne vous limitez pas à l'état civil : les questions ci-dessous sont pensées comme un guide
+        d'entretien avec la famille pour {ceremony.deceasedName || 'le défunt'} — au-delà des
+        dates, ce qui donne du relief à un éloge, ce sont les détails vécus, les mots qu'on
+        répétait, ce que les proches en disent chacun à leur façon. Une ébauche de texte pourra
+        être générée à partir de ce que vous remplissez ci-dessous — à relire et personnaliser,
+        elle ne remplace pas vos propres mots.
       </p>
 
       <section className="mt-6 space-y-4 rounded-lg border border-line bg-panel p-5">
@@ -194,7 +197,7 @@ export default function Biography() {
       </section>
 
       <section className="mt-6 space-y-4 rounded-lg border border-line bg-panel p-5">
-        <h3 className="font-display text-lg text-fg">Vie professionnelle</h3>
+        <h3 className="font-display text-lg text-fg">Vie professionnelle et engagements</h3>
         <Field label="Métier, parcours professionnel">
           <textarea
             value={bio.career ?? ''}
@@ -204,10 +207,22 @@ export default function Biography() {
             className={inputClass}
           />
         </Field>
+        <Field
+          label="Engagements (associatifs, bénévolat, religieux…)"
+          hint="Un club, une paroisse, une association, le conseil municipal, les pompiers volontaires…"
+        >
+          <textarea
+            value={bio.volunteering ?? ''}
+            onChange={(e) => update({ volunteering: e.target.value })}
+            rows={2}
+            placeholder="Ex. : comme bénévole aux Restos du Cœur pendant quinze ans"
+            className={inputClass}
+          />
+        </Field>
       </section>
 
       <section className="mt-6 space-y-4 rounded-lg border border-line bg-panel p-5">
-        <h3 className="font-display text-lg text-fg">Conjoint(e) et enfants</h3>
+        <h3 className="font-display text-lg text-fg">Conjoint(e), enfants et petits-enfants</h3>
         <Field label="Rencontre avec l'époux/l'épouse">
           <textarea
             value={bio.metSpouse ?? ''}
@@ -277,10 +292,75 @@ export default function Biography() {
             </button>
           </div>
         )}
+
+        <Field label="Petits-enfants" hint="Prénoms, ou une phrase sur ce que représentait ce rôle de grand-père/grand-mère.">
+          <textarea
+            value={bio.grandchildren ?? ''}
+            onChange={(e) => update({ grandchildren: e.target.value })}
+            rows={2}
+            placeholder="Ex. : Lucas, Emma et Noé"
+            className={inputClass}
+          />
+        </Field>
       </section>
 
       <section className="mt-6 space-y-4 rounded-lg border border-line bg-panel p-5">
-        <h3 className="font-display text-lg text-fg">Passions et souvenirs</h3>
+        <h3 className="font-display text-lg text-fg">Portrait et personnalité</h3>
+        <p className="text-xs text-muted">
+          Le cœur d'un bel éloge : ce qui le/la rendait unique, au-delà des faits.
+        </p>
+        <Field label="Comment le/la décririez-vous en quelques mots ?">
+          <textarea
+            value={bio.characterTraits ?? ''}
+            onChange={(e) => update({ characterTraits: e.target.value })}
+            rows={2}
+            placeholder="Ex. : généreux, toujours de bonne humeur, d'une grande patience"
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Une phrase ou une expression qu'il/elle répétait souvent">
+          <textarea
+            value={bio.sayings ?? ''}
+            onChange={(e) => update({ sayings: e.target.value })}
+            rows={2}
+            placeholder="Ex. : « On n'est jamais mieux servi que par soi-même »"
+            className={inputClass}
+          />
+        </Field>
+        <Field
+          label="Un objet, un lieu, une odeur ou une chanson qui lui est associé"
+          hint="Ce qui fera dire à ses proches « ça, c'était tellement lui/elle »."
+        >
+          <textarea
+            value={bio.symbolicObject ?? ''}
+            onChange={(e) => update({ symbolicObject: e.target.value })}
+            rows={2}
+            placeholder="Ex. : l'odeur du café le matin, son fauteuil au coin du salon, une chanson d'Édith Piaf…"
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Ce dont il/elle était le/la plus fier(ère)">
+          <textarea
+            value={bio.proudestOf ?? ''}
+            onChange={(e) => update({ proudestOf: e.target.value })}
+            rows={2}
+            placeholder="Ex. : avoir vu ses enfants réussir, avoir construit sa maison de ses mains…"
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Une valeur, un principe de vie qui le/la guidait">
+          <textarea
+            value={bio.guidingValue ?? ''}
+            onChange={(e) => update({ guidingValue: e.target.value })}
+            rows={2}
+            placeholder="Ex. : la famille avant tout, ne jamais se coucher fâché…"
+            className={inputClass}
+          />
+        </Field>
+      </section>
+
+      <section className="mt-6 space-y-4 rounded-lg border border-line bg-panel p-5">
+        <h3 className="font-display text-lg text-fg">Passions et anecdotes</h3>
         <Field label="Passions, loisirs">
           <textarea
             value={bio.passions ?? ''}
@@ -293,6 +373,10 @@ export default function Biography() {
 
         <div>
           <span className="mb-1 block text-xs text-muted">Anecdotes</span>
+          <p className="mb-2 text-xs text-muted">
+            Un détail précis vaut mieux qu'une généralité : un running gag familial, une habitude
+            immanquable, un jour où il/elle vous a surpris(e)…
+          </p>
           <div className="space-y-2">
             {bio.anecdotes.map((a, i) => (
               <div key={i} className="flex items-start gap-2">
@@ -319,8 +403,39 @@ export default function Biography() {
             + Ajouter une anecdote
           </button>
         </div>
+      </section>
 
-        <Field label="Autres informations" hint="Tout ce qui ne trouve pas sa place ailleurs.">
+      <section className="mt-6 space-y-4 rounded-lg border border-line bg-panel p-5">
+        <h3 className="font-display text-lg text-fg">Le regard de ses proches</h3>
+        <Field
+          label="Comment son conjoint, ses enfants, ses amis ou ses collègues le/la décriraient"
+          hint="Chaque regard est différent : un père pour ses enfants n'est pas tout à fait le même homme pour ses collègues. Notez ce que chacun en dit, même en quelques mots."
+        >
+          <textarea
+            value={bio.lovedOnesView ?? ''}
+            onChange={(e) => update({ lovedOnesView: e.target.value })}
+            rows={4}
+            placeholder="Ex. : Pour ses petits-enfants, c'était le roi des histoires du soir. Ses collègues se souviennent d'un homme toujours prêt à donner un coup de main…"
+            className={inputClass}
+          />
+        </Field>
+        <Field
+          label="S'il/elle pouvait laisser un dernier mot"
+          hint="Une phrase de conclusion pour l'éloge : ce qu'il/elle aurait voulu qu'on retienne, ou qu'on se dise après son départ."
+        >
+          <textarea
+            value={bio.legacyWish ?? ''}
+            onChange={(e) => update({ legacyWish: e.target.value })}
+            rows={2}
+            placeholder="Ex. : Profitez de chaque instant avec ceux que vous aimez"
+            className={inputClass}
+          />
+        </Field>
+      </section>
+
+      <section className="mt-6 space-y-4 rounded-lg border border-line bg-panel p-5">
+        <h3 className="font-display text-lg text-fg">Autres informations</h3>
+        <Field label="Tout ce qui ne trouve pas sa place ailleurs">
           <textarea
             value={bio.notes ?? ''}
             onChange={(e) => update({ notes: e.target.value })}
