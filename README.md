@@ -16,7 +16,7 @@ Application web (PC et tablette) pensée pour les maîtres de cérémonie du fun
 - **Sauvegarde** : export/import d'une sauvegarde complète (ZIP) de toutes les cérémonies, musiques et photos, à conserver ailleurs que sur l'appareil.
 - **Application installable (PWA)** : à installer sur l'écran d'accueil d'une tablette ou d'un PC comme une vraie application, avec mise en cache de l'appli pour un chargement garanti même sans réseau.
 - **Accès protégé par licence** : l'application est verrouillée tant qu'une clé d'activation valide n'a pas été saisie ; chaque poste choisit ensuite son identifiant et son mot de passe (plusieurs identifiants possibles par licence, selon le nombre de postes vendus). Voir « Licences et activation » ci-dessous.
-- **Paramètres** : afficher/masquer le prompteur et le compteur d'avance/retard en régie, taille de texte et vitesse de défilement par défaut, masquer la bibliothèque libre de droit dans les sélecteurs de musique, informations de licence et changement de mot de passe.
+- **Paramètres** : afficher/masquer le prompteur et le compteur d'avance/retard en régie, taille de texte et vitesse de défilement par défaut, masquer la bibliothèque libre de droit dans les sélecteurs de musique, durée du fondu de sortie, check-list technique avant le direct (désactivée par défaut, activable au besoin), informations de licence et changement de mot de passe.
 
 ## Démarrer en développement
 

@@ -8,6 +8,7 @@ import { resolveAudioDuration } from '../lib/audioDuration'
 import { computePace, paceLabel } from '../lib/pace'
 import { loadKeymap, normalizeKey, saveKeymap, type Keymap, type RemoteAction } from '../lib/remoteControl'
 import RemoteControlSettings from '../components/RemoteControlSettings'
+import PreCeremonyChecklist from '../components/PreCeremonyChecklist'
 import {
   detectAudioOutputCapability,
   isApplePlatform,
@@ -71,6 +72,7 @@ export default function LiveMode() {
 
   const [keymap, setKeymap] = useState<Keymap>(() => loadKeymap())
   const [showRemoteSettings, setShowRemoteSettings] = useState(false)
+  const [showChecklist, setShowChecklist] = useState(false)
 
   const [musicTab, setMusicTab] = useState<'player' | 'library'>('player')
   const [musicSearch, setMusicSearch] = useState('')
@@ -498,6 +500,15 @@ export default function LiveMode() {
           >
             ⌨️ Télécommande
           </button>
+          {appSettings.enablePreCeremonyChecklist && (
+            <button
+              onClick={() => setShowChecklist(true)}
+              title="Repasser en revue les points techniques usuels avant de démarrer"
+              className="rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:border-gold-dim hover:text-fg"
+            >
+              ✅ Check-list
+            </button>
+          )}
         </div>
       </header>
 
@@ -809,6 +820,7 @@ export default function LiveMode() {
           onClose={() => setShowRemoteSettings(false)}
         />
       )}
+      {showChecklist && <PreCeremonyChecklist onClose={() => setShowChecklist(false)} />}
     </div>
   )
 }

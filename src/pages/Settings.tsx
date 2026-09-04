@@ -146,6 +146,24 @@ export default function Settings() {
         </p>
       </section>
 
+      <section className="mb-6 rounded-lg border border-line bg-panel p-5">
+        <h3 className="mb-3 font-display text-lg text-fg">Check-list technique</h3>
+        <label className="flex items-center justify-between gap-4 py-1">
+          <span className="text-sm text-fg">Activer la check-list avant le direct</span>
+          <input
+            type="checkbox"
+            checked={settings.enablePreCeremonyChecklist}
+            onChange={(e) => update('enablePreCeremonyChecklist', e.target.checked)}
+            className="h-4 w-4 accent-gold"
+          />
+        </label>
+        <p className="text-xs text-muted">
+          Désactivée par défaut. Une fois activée, un bouton « ✅ Check-list » apparaît dans l'en-tête
+          de la régie pour repasser en revue les points techniques usuels (sortie audio, musiques,
+          diaporama, projection…) avant de démarrer.
+        </p>
+      </section>
+
       <section className="rounded-lg border border-line bg-panel p-5">
         <h3 className="mb-3 font-display text-lg text-fg">Compte & licence</h3>
         {license && (

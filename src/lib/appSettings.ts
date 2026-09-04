@@ -9,6 +9,7 @@ export interface AppSettings {
   defaultScrollSpeed: number
   hideBuiltInLibrary: boolean
   defaultFadeOutSeconds: number
+  enablePreCeremonyChecklist: boolean
 }
 
 export const defaultAppSettings: AppSettings = {
@@ -18,6 +19,7 @@ export const defaultAppSettings: AppSettings = {
   defaultScrollSpeed: 28,
   hideBuiltInLibrary: false,
   defaultFadeOutSeconds: 2,
+  enablePreCeremonyChecklist: false,
 }
 
 const STORAGE_KEY = 'cerema-app-settings-v1'
