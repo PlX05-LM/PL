@@ -4,6 +4,7 @@ import { db } from '../db'
 import { newId } from '../lib/ids'
 import { formatDuration, resolveAudioDuration } from '../lib/audioDuration'
 import type { BuiltInLibraryProgress } from '../lib/royaltyFreeMusic'
+import AudioTrimModal from '../components/AudioTrimModal'
 import type { Track } from '../types'
 
 async function readDuration(blob: Blob): Promise<number | undefined> {
@@ -29,6 +30,7 @@ export default function MusicLibrary() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [importing, setImporting] = useState(false)
   const [builtInProgress, setBuiltInProgress] = useState<BuiltInLibraryProgress | null>(null)
+  const [trimmingTrack, setTrimmingTrack] = useState<Track | null>(null)
   const hasBuiltInLibrary = tracks.some((t) => t.id.startsWith('builtin-'))
 
   async function handleImportBuiltInLibrary() {
@@ -185,6 +187,19 @@ export default function MusicLibrary() {
               )}
               <span className="text-xs text-muted">{formatDuration(t.duration)}</span>
               <button
+                onClick={() => {
+                  if (playingId === t.id) {
+                    audioRef.current?.pause()
+                    setPlayingId(null)
+                  }
+                  setTrimmingTrack(t)
+                }}
+                title="Analyser la forme d'onde et couper les passages indésirables (intro bruitée, etc.)"
+                className="text-xs text-muted hover:text-fg"
+              >
+                ✂️ Couper
+              </button>
+              <button
                 onClick={() => remove(t)}
                 className="text-xs text-muted hover:text-danger"
               >
@@ -193,6 +208,10 @@ export default function MusicLibrary() {
             </li>
           ))}
         </ul>
+      )}
+
+      {trimmingTrack && (
+        <AudioTrimModal track={trimmingTrack} onClose={() => setTrimmingTrack(null)} />
       )}
     </div>
   )
