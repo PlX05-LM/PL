@@ -35,6 +35,20 @@ export async function createAccount(username: string, password: string): Promise
   return record
 }
 
+export async function changePassword(
+  accountId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<boolean> {
+  const account = await db.accounts.get(accountId)
+  if (!account) return false
+  const ok = await verifyPassword(currentPassword, account.passwordSaltHex, account.passwordHashHex)
+  if (!ok) return false
+  const { saltHex, hashHex } = await hashPassword(newPassword)
+  await db.accounts.update(accountId, { passwordSaltHex: saltHex, passwordHashHex: hashHex })
+  return true
+}
+
 export async function verifyLogin(username: string, password: string): Promise<AccountRecord | null> {
   const accounts = await db.accounts.toArray()
   const account = accounts.find((a) => a.username.toLowerCase() === username.trim().toLowerCase())

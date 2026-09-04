@@ -19,6 +19,7 @@ import {
   showAirPlayPicker,
   unlockDeviceLabels,
 } from '../lib/audioOutput'
+import { isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
 
 function formatClock(sec: number) {
   if (!Number.isFinite(sec)) return '--:--'
@@ -34,10 +35,12 @@ export default function LiveMode() {
   const tracks = useLiveQuery(() => db.tracks.toArray(), []) ?? []
   const allPhotos = useLiveQuery(() => db.photos.toArray(), []) ?? []
 
+  const appSettings = useMemo(() => loadAppSettings(), [])
+
   const [segmentIndex, setSegmentIndex] = useState(0)
-  const [fontSize, setFontSize] = useState(40)
+  const [fontSize, setFontSize] = useState(appSettings.defaultFontSize)
   const [autoScroll, setAutoScroll] = useState(false)
-  const [scrollSpeed, setScrollSpeed] = useState(28) // px/s
+  const [scrollSpeed, setScrollSpeed] = useState(appSettings.defaultScrollSpeed) // px/s
   const promptRef = useRef<HTMLTextAreaElement>(null)
 
   const [manualTrackId, setManualTrackId] = useState<string>('')
@@ -80,12 +83,17 @@ export default function LiveMode() {
     [segments, segmentIndex, elapsed, startedAt],
   )
 
+  const selectableTracks = useMemo(
+    () => (appSettings.hideBuiltInLibrary ? tracks.filter((t) => !isBuiltInTrackId(t.id)) : tracks),
+    [tracks, appSettings.hideBuiltInLibrary],
+  )
+
   const libraryTracks = useMemo(() => {
     const q = musicSearch.trim().toLowerCase()
-    return [...tracks]
+    return [...selectableTracks]
       .filter((t) => t.name.toLowerCase().includes(q))
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [tracks, musicSearch])
+  }, [selectableTracks, musicSearch])
 
   const slidePhotos = useMemo(() => {
     if (!ceremony) return []
@@ -446,7 +454,7 @@ export default function LiveMode() {
           <div className="font-mono text-sm text-muted">
             {formatClock(elapsed)} / {formatClock(totalEstimated)}
           </div>
-          {pace && (
+          {appSettings.showPaceIndicator && pace && (
             <span
               title="Compare le temps écoulé à la durée prévue des étapes déjà passées"
               className={`rounded-full border px-3 py-1 text-xs font-medium ${
@@ -523,41 +531,49 @@ export default function LiveMode() {
         <section className="flex flex-col overflow-hidden bg-black">
           <div className="flex items-center gap-4 border-b border-line bg-panel px-4 py-2 text-sm">
             <span className="text-muted">{currentSegment?.title ?? 'Aucune étape'}</span>
-            <div className="ml-auto flex items-center gap-3">
-              <label className="flex items-center gap-1 text-muted">
-                <input type="checkbox" checked={autoScroll} onChange={toggleAutoScrollState} />
-                Défilement auto
-              </label>
-              <span className="text-muted">Vitesse</span>
-              <input
-                type="range"
-                min={5}
-                max={100}
-                value={scrollSpeed}
-                onChange={(e) => setScrollSpeed(Number(e.target.value))}
-                className="w-20"
-              />
-              <span className="text-muted">Taille</span>
-              <input
-                type="range"
-                min={20}
-                max={80}
-                value={fontSize}
-                onChange={(e) => setFontSize(Number(e.target.value))}
-                className="w-20"
-              />
-            </div>
+            {appSettings.showTeleprompter && (
+              <div className="ml-auto flex items-center gap-3">
+                <label className="flex items-center gap-1 text-muted">
+                  <input type="checkbox" checked={autoScroll} onChange={toggleAutoScrollState} />
+                  Défilement auto
+                </label>
+                <span className="text-muted">Vitesse</span>
+                <input
+                  type="range"
+                  min={5}
+                  max={100}
+                  value={scrollSpeed}
+                  onChange={(e) => setScrollSpeed(Number(e.target.value))}
+                  className="w-20"
+                />
+                <span className="text-muted">Taille</span>
+                <input
+                  type="range"
+                  min={20}
+                  max={80}
+                  value={fontSize}
+                  onChange={(e) => setFontSize(Number(e.target.value))}
+                  className="w-20"
+                />
+              </div>
+            )}
           </div>
           <div className="flex-1 overflow-hidden px-10 py-8">
-            <textarea
-              ref={promptRef}
-              key={currentSegment?.id ?? 'none'}
-              defaultValue={currentSegment?.script ?? ''}
-              onChange={(e) => updateScript(e.target.value)}
-              placeholder="Aucun texte pour cette étape…"
-              style={{ fontSize: `${fontSize}px`, lineHeight: 1.5 }}
-              className="h-full w-full resize-none border-none bg-transparent text-fg outline-none scrollbar-thin placeholder:text-muted"
-            />
+            {appSettings.showTeleprompter ? (
+              <textarea
+                ref={promptRef}
+                key={currentSegment?.id ?? 'none'}
+                defaultValue={currentSegment?.script ?? ''}
+                onChange={(e) => updateScript(e.target.value)}
+                placeholder="Aucun texte pour cette étape…"
+                style={{ fontSize: `${fontSize}px`, lineHeight: 1.5 }}
+                className="h-full w-full resize-none border-none bg-transparent text-fg outline-none scrollbar-thin placeholder:text-muted"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-center text-sm text-muted">
+                Prompteur masqué — réactivable dans Paramètres.
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-between border-t border-line bg-panel px-4 py-2 text-xs">
             <div className="flex gap-2">
@@ -599,7 +615,7 @@ export default function LiveMode() {
                     musicTab === 'library' ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
                   }`}
                 >
-                  Bibliothèque ({tracks.length})
+                  Bibliothèque ({selectableTracks.length})
                 </button>
               </div>
             </div>
@@ -645,7 +661,7 @@ export default function LiveMode() {
                   className="w-full rounded-md border border-line bg-panel-2 px-2 py-2 text-sm text-fg outline-none focus:border-gold-dim"
                 >
                   <option value="">— Choisir une musique —</option>
-                  {tracks.map((t) => (
+                  {selectableTracks.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
                     </option>

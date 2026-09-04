@@ -7,6 +7,7 @@ const navItems = [
   { to: '/musique', label: 'Musiques', icon: '♪' },
   { to: '/photos', label: 'Photothèque', icon: '⌘' },
   { to: '/sauvegarde', label: 'Sauvegarde', icon: '⤓' },
+  { to: '/parametres', label: 'Paramètres', icon: '⚙️' },
 ]
 
 function handleLogout() {

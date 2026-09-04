@@ -5,6 +5,7 @@ import { db } from '../db'
 import { newId } from '../lib/ids'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { collectCeremonyTracks } from '../lib/ceremonyTracks'
+import { isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
 import TextLibraryModal from '../components/TextLibraryModal'
 import type {
   Ceremony,
@@ -39,6 +40,14 @@ export default function CeremonyEditor() {
   const ceremony = useLiveQuery(() => (id ? db.ceremonies.get(id) : undefined), [id])
   const tracks = useLiveQuery(() => db.tracks.orderBy('name').toArray(), []) ?? []
   const photos = useLiveQuery(() => db.photos.orderBy('createdAt').toArray(), []) ?? []
+  const appSettings = useMemo(() => loadAppSettings(), [])
+  // Filtré uniquement pour les sélecteurs (affectation d'un morceau) — les
+  // pistes déjà affectées restent résolues normalement (export PDF/ZIP,
+  // lecture) même si la bibliothèque libre de droit est masquée.
+  const selectableTracks = useMemo(
+    () => (appSettings.hideBuiltInLibrary ? tracks.filter((t) => !isBuiltInTrackId(t.id)) : tracks),
+    [tracks, appSettings.hideBuiltInLibrary],
+  )
 
   const [draft, setDraft] = useState<Ceremony | null>(null)
 
@@ -310,7 +319,7 @@ export default function CeremonyEditor() {
                       className="rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
                     >
                       <option value="">🎵 Aucune musique</option>
-                      {tracks.map((t) => (
+                      {selectableTracks.map((t) => (
                         <option key={t.id} value={t.id}>
                           🎵 {t.name}
                         </option>
@@ -437,7 +446,7 @@ export default function CeremonyEditor() {
                 className="rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
               >
                 <option value="">Aucune</option>
-                {tracks.map((t) => (
+                {selectableTracks.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>

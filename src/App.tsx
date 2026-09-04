@@ -8,6 +8,7 @@ import PhotoLibrary from './pages/PhotoLibrary'
 import LiveMode from './pages/LiveMode'
 import Projector from './pages/Projector'
 import Backup from './pages/Backup'
+import Settings from './pages/Settings'
 import PwaUpdatePrompt from './components/PwaUpdatePrompt'
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/musique" element={<MusicLibrary />} />
           <Route path="/photos" element={<PhotoLibrary />} />
           <Route path="/sauvegarde" element={<Backup />} />
+          <Route path="/parametres" element={<Settings />} />
         </Route>
       </Routes>
       <PwaUpdatePrompt />
