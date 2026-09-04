@@ -41,6 +41,38 @@ export interface CeremonySegment {
 
 export type CeremonyType = 'obseques' | 'creation' | 'inhumation' | 'hommage' | 'autre'
 
+export interface BiographyChild {
+  id: string
+  name: string
+  birthDate?: string
+}
+
+export interface Biography {
+  gender: 'homme' | 'femme' | 'non-precise'
+  birthDate?: string
+  birthPlace?: string
+  education?: string
+  siblings?: string
+  career?: string
+  metSpouse?: string
+  spouseName?: string
+  weddingDate?: string
+  hasChildren: boolean
+  children: BiographyChild[]
+  passions?: string
+  anecdotes: string[]
+  notes?: string
+}
+
+export function createEmptyBiography(): Biography {
+  return {
+    gender: 'non-precise',
+    hasChildren: false,
+    children: [],
+    anecdotes: [],
+  }
+}
+
 export interface LiveState {
   segmentIndex: number
   startedAt: number | null
@@ -65,6 +97,8 @@ export interface Ceremony {
   updatedAt: number
   /** Permet de reprendre la régie live là où elle en était après un rechargement/plantage. */
   liveState?: LiveState
+  /** Informations biographiques recueillies auprès de la famille, pour préparer l'éloge. */
+  biography?: Biography
 }
 
 export function createEmptyCeremony(id: string): Ceremony {

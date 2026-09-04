@@ -173,6 +173,13 @@ export default function CeremonyEditor() {
         </button>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => navigate(`/ceremonies/${draft.id}/biographie`)}
+            className="rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg"
+            title="Recueillir les informations biographiques et préparer l'éloge"
+          >
+            📝 Biographie
+          </button>
+          <button
             onClick={handleExportPdf}
             disabled={exportingPdf}
             className="rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg disabled:opacity-40"
