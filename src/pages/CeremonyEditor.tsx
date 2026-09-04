@@ -7,6 +7,7 @@ import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { collectCeremonyTracks } from '../lib/ceremonyTracks'
 import { isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
 import TextLibraryModal from '../components/TextLibraryModal'
+import PoemLibraryModal from '../components/PoemLibraryModal'
 import type {
   Ceremony,
   CeremonySegment,
@@ -101,6 +102,7 @@ export default function CeremonyEditor() {
   }
 
   const [textLibraryForSegment, setTextLibraryForSegment] = useState<string | null>(null)
+  const [poemLibraryForSegment, setPoemLibraryForSegment] = useState<string | null>(null)
 
   function insertText(segId: string, text: string) {
     if (!draft) return
@@ -109,6 +111,7 @@ export default function CeremonyEditor() {
     const script = segment.script.trim() ? `${segment.script}\n\n${text}` : text
     updateSegment(segId, { script })
     setTextLibraryForSegment(null)
+    setPoemLibraryForSegment(null)
   }
 
   function togglePhoto(photoId: string) {
@@ -340,13 +343,22 @@ export default function CeremonyEditor() {
                       rows={3}
                       className="w-full resize-y rounded-md border border-line bg-panel-2 px-3 py-2 text-sm text-fg outline-none placeholder:text-muted focus:border-gold-dim"
                     />
-                    <button
-                      onClick={() => setTextLibraryForSegment(seg.id)}
-                      title="Insérer un texte-type (ouverture, transition, hommage, clôture, pensées, repères religieux)"
-                      className="shrink-0 whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
-                    >
-                      📖 Texte-type
-                    </button>
+                    <div className="flex shrink-0 flex-col gap-1">
+                      <button
+                        onClick={() => setTextLibraryForSegment(seg.id)}
+                        title="Insérer un texte-type (ouverture, transition, hommage, clôture, pensées, repères religieux)"
+                        className="whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+                      >
+                        📖 Texte-type
+                      </button>
+                      <button
+                        onClick={() => setPoemLibraryForSegment(seg.id)}
+                        title="Insérer un poème (classés par situation de deuil)"
+                        className="whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+                      >
+                        📜 Poème
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -502,6 +514,13 @@ export default function CeremonyEditor() {
         <TextLibraryModal
           onInsert={(text) => insertText(textLibraryForSegment, text)}
           onClose={() => setTextLibraryForSegment(null)}
+        />
+      )}
+
+      {poemLibraryForSegment && (
+        <PoemLibraryModal
+          onInsert={(text) => insertText(poemLibraryForSegment, text)}
+          onClose={() => setPoemLibraryForSegment(null)}
         />
       )}
     </div>
