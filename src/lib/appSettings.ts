@@ -8,6 +8,7 @@ export interface AppSettings {
   defaultFontSize: number
   defaultScrollSpeed: number
   hideBuiltInLibrary: boolean
+  defaultFadeOutSeconds: number
 }
 
 export const defaultAppSettings: AppSettings = {
@@ -16,6 +17,7 @@ export const defaultAppSettings: AppSettings = {
   defaultFontSize: 40,
   defaultScrollSpeed: 28,
   hideBuiltInLibrary: false,
+  defaultFadeOutSeconds: 2,
 }
 
 const STORAGE_KEY = 'cerema-app-settings-v1'

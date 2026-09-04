@@ -262,7 +262,8 @@ export default function LiveMode() {
     const audio = audioRef.current
     if (!audio) return
     const startVol = audio.volume
-    const steps = 20
+    const tickMs = 100
+    const steps = Math.max(1, Math.round((appSettings.defaultFadeOutSeconds * 1000) / tickMs))
     let i = 0
     const t = setInterval(() => {
       i += 1
@@ -273,7 +274,7 @@ export default function LiveMode() {
         audio.volume = volume
         setIsPlaying(false)
       }
-    }, 100)
+    }, tickMs)
   }
 
   useEffect(() => {

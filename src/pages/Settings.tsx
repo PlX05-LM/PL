@@ -125,9 +125,24 @@ export default function Settings() {
             className="h-4 w-4 accent-gold"
           />
         </label>
-        <p className="text-xs text-muted">
+        <p className="mb-4 text-xs text-muted">
           Utile si votre agence utilise exclusivement ses propres musiques : les 20 pistes fournies
           restent en mémoire mais disparaissent des sélecteurs (régie et fiche cérémonie).
+        </p>
+        <label className="text-xs text-muted">
+          Durée du fondu de sortie (secondes)
+          <input
+            type="number"
+            min={0.5}
+            max={15}
+            step={0.5}
+            value={settings.defaultFadeOutSeconds}
+            onChange={(e) => update('defaultFadeOutSeconds', Number(e.target.value))}
+            className={`mt-1 ${inputClass}`}
+          />
+        </label>
+        <p className="mt-1 text-xs text-muted">
+          Durée du fondu déclenché par le bouton « Fondu ↘ » en régie.
         </p>
       </section>
 
