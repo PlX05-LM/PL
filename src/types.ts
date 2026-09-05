@@ -17,6 +17,16 @@ export interface Track {
    * été ajoutée, et non dans les suivantes.
    */
   ceremonyId?: string
+  /**
+   * Fichier d'origine, conservé dès la première coupe pour permettre de revenir en
+   * arrière ou de recouper en récupérant un passage précédemment retiré. Absent tant
+   * qu'aucune coupe n'a jamais été faite sur cette piste.
+   */
+  originalBlob?: Blob
+  originalMimeType?: string
+  /** Bornes de la coupe actuellement active, dans le repère du fichier d'origine. */
+  trimStartSec?: number
+  trimEndSec?: number
 }
 
 export interface Photo {

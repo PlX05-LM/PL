@@ -42,14 +42,26 @@ export default function AudioTrimModal({ track, onClose }: Props) {
     endSecRef.current = endSec
   }, [endSec])
 
+  // On repart toujours du fichier d'origine s'il existe (piste déjà coupée
+  // auparavant) : la forme d'onde complète reste disponible pour recouper en
+  // récupérant un passage précédemment retiré, plutôt que de repartir du
+  // fichier déjà tronqué.
+  const sourceBlob = track.originalBlob ?? track.blob
+
   useEffect(() => {
     let cancelled = false
-    decodeAudioBlob(track.blob)
+    decodeAudioBlob(sourceBlob)
       .then((buf) => {
         if (cancelled) return
         setBuffer(buf)
         setPeaks(computeWaveformPeaks(buf, WAVEFORM_BINS))
-        setEndSec(buf.duration)
+        // Reprend la coupe actuellement active comme point de départ, plutôt que la
+        // piste entière, pour ne pas donner l'impression que la coupe précédente a
+        // disparu — tout en laissant les repères libres de revenir sur le passage retiré.
+        const start = track.trimStartSec ?? 0
+        const end = track.trimEndSec ?? buf.duration
+        setStartSec(Math.max(0, Math.min(start, buf.duration)))
+        setEndSec(Math.max(0, Math.min(end, buf.duration)))
       })
       .catch(() => {
         if (!cancelled) setError("Impossible d'analyser ce fichier audio.")
@@ -57,7 +69,8 @@ export default function AudioTrimModal({ track, onClose }: Props) {
     return () => {
       cancelled = true
     }
-  }, [track.blob])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceBlob])
 
   useEffect(() => {
     return () => {
@@ -128,7 +141,7 @@ export default function AudioTrimModal({ track, onClose }: Props) {
       return
     }
     if (!buffer) return
-    if (!previewUrlRef.current) previewUrlRef.current = URL.createObjectURL(track.blob)
+    if (!previewUrlRef.current) previewUrlRef.current = URL.createObjectURL(sourceBlob)
     const audio = previewAudioRef.current ?? new Audio()
     previewAudioRef.current = audio
     audio.src = previewUrlRef.current
@@ -158,7 +171,36 @@ export default function AudioTrimModal({ track, onClose }: Props) {
       setPreviewing(false)
       const trimmed = trimAudioBuffer(buffer, startSec, endSec)
       const blob = audioBufferToWavBlob(trimmed)
-      await db.tracks.update(track.id, { blob, mimeType: 'audio/wav', duration: trimmed.duration })
+      await db.tracks.update(track.id, {
+        blob,
+        mimeType: 'audio/wav',
+        duration: trimmed.duration,
+        // Le fichier d'origine n'est enregistré qu'une fois, à la toute première
+        // coupe : les coupes suivantes repartent toujours de ce même original.
+        originalBlob: track.originalBlob ?? track.blob,
+        originalMimeType: track.originalMimeType ?? track.mimeType,
+        trimStartSec: startSec,
+        trimEndSec: endSec,
+      })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleRestore() {
+    if (!track.originalBlob || !buffer) return
+    setSaving(true)
+    try {
+      previewAudioRef.current?.pause()
+      setPreviewing(false)
+      await db.tracks.update(track.id, {
+        blob: track.originalBlob,
+        mimeType: track.originalMimeType ?? 'audio/wav',
+        duration: buffer.duration,
+        trimStartSec: undefined,
+        trimEndSec: undefined,
+      })
       onClose()
     } finally {
       setSaving(false)
@@ -169,6 +211,7 @@ export default function AudioTrimModal({ track, onClose }: Props) {
   const startPct = duration ? (startSec / duration) * 100 : 0
   const endPct = duration ? (endSec / duration) * 100 : 100
   const hasTrim = buffer ? startSec > 0.05 || endSec < buffer.duration - 0.05 : false
+  const hasActiveTrim = track.trimStartSec !== undefined || track.trimEndSec !== undefined
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
@@ -208,20 +251,21 @@ export default function AudioTrimModal({ track, onClose }: Props) {
                   className="absolute inset-y-0 right-0 bg-ink/70"
                   style={{ width: `${100 - endPct}%` }}
                 />
-                {/* Poignée de début */}
+                {/* Poignée de début — position bornée pour rester entièrement cliquable même
+                    en butée (l'overflow-hidden du conteneur coupe sinon la zone de clic). */}
                 <div
                   onPointerDown={startDrag('start')}
                   className="absolute inset-y-0 z-10 w-3 cursor-ew-resize touch-none"
-                  style={{ left: `calc(${startPct}% - 6px)` }}
+                  style={{ left: `clamp(0px, calc(${startPct}% - 6px), calc(100% - 12px))` }}
                 >
                   <div className="mx-auto h-full w-0.5 bg-gold" />
                   <div className="absolute -top-1 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-gold" />
                 </div>
-                {/* Poignée de fin */}
+                {/* Poignée de fin — même précaution que la poignée de début. */}
                 <div
                   onPointerDown={startDrag('end')}
                   className="absolute inset-y-0 z-10 w-3 cursor-ew-resize touch-none"
-                  style={{ left: `calc(${endPct}% - 6px)` }}
+                  style={{ left: `clamp(0px, calc(${endPct}% - 6px), calc(100% - 12px))` }}
                 >
                   <div className="mx-auto h-full w-0.5 bg-gold" />
                   <div className="absolute -top-1 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full bg-gold" />
@@ -262,10 +306,21 @@ export default function AudioTrimModal({ track, onClose }: Props) {
         </div>
 
         <div className="flex items-center justify-between border-t border-line px-4 py-3">
-          <p className="text-xs text-muted">
-            Remplace définitivement le fichier importé (le morceau original ne sera plus récupérable).
+          <p className="max-w-xs text-xs text-muted">
+            Le fichier d'origine est conservé : vous pourrez toujours recouper plus tard, y
+            compris récupérer un passage déjà retiré.
           </p>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 items-center gap-2">
+            {hasActiveTrim && (
+              <button
+                onClick={handleRestore}
+                disabled={saving}
+                title="Revenir au fichier original, sans aucune coupe"
+                className="rounded-md border border-line px-3 py-2 text-xs text-muted hover:border-gold-dim hover:text-fg disabled:opacity-50"
+              >
+                ↺ Restaurer l'original
+              </button>
+            )}
             <button onClick={onClose} className="rounded-md border border-line px-4 py-2 text-sm text-muted hover:text-fg">
               Annuler
             </button>

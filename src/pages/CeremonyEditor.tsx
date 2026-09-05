@@ -150,6 +150,15 @@ export default function CeremonyEditor() {
     update({ slideshow: { ...draft.slideshow, photoIds } })
   }
 
+  function moveSelectedPhoto(index: number, dir: -1 | 1) {
+    if (!draft) return
+    const photoIds = [...draft.slideshow.photoIds]
+    const target = index + dir
+    if (target < 0 || target >= photoIds.length) return
+    ;[photoIds[index], photoIds[target]] = [photoIds[target], photoIds[index]]
+    update({ slideshow: { ...draft.slideshow, photoIds } })
+  }
+
   const [addingNatureTheme, setAddingNatureTheme] = useState<NatureTheme | null>(null)
 
   async function addNatureThemeToSlideshow(theme: NatureTheme) {
@@ -725,6 +734,56 @@ export default function CeremonyEditor() {
                 />
               </label>
             </div>
+
+            {draft.slideshow.photoIds.length > 0 && (
+              <div className="mb-4 rounded-md border border-line bg-panel-2 p-3">
+                <p className="mb-2 text-xs text-muted">
+                  Ordre du diaporama — corrigez avec les flèches plutôt que de tout resélectionner
+                  en cas d'erreur de clic.
+                </p>
+                <ul className="space-y-1">
+                  {draft.slideshow.photoIds.map((pid, i) => {
+                    const p = photos.find((ph) => ph.id === pid)
+                    if (!p) return null
+                    return (
+                      <li
+                        key={pid}
+                        className="flex items-center gap-2 rounded-md bg-panel px-2 py-1.5"
+                      >
+                        <span className="w-5 shrink-0 text-center text-xs text-muted">{i + 1}</span>
+                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded border border-line">
+                          <PhotoThumb blob={p.blob} />
+                        </div>
+                        <span className="flex-1 truncate text-sm text-fg">{p.name}</span>
+                        <button
+                          onClick={() => moveSelectedPhoto(i, -1)}
+                          disabled={i === 0}
+                          className="text-muted hover:text-gold disabled:opacity-30"
+                          title="Monter"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          onClick={() => moveSelectedPhoto(i, 1)}
+                          disabled={i === draft.slideshow.photoIds.length - 1}
+                          className="text-muted hover:text-gold disabled:opacity-30"
+                          title="Descendre"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          onClick={() => togglePhoto(pid)}
+                          className="text-xs text-muted hover:text-danger"
+                          title="Retirer du diaporama"
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
 
             <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel-2 p-3">
               <span className="text-xs text-muted">
