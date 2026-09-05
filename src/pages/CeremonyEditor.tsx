@@ -5,7 +5,14 @@ import { db } from '../db'
 import { newId } from '../lib/ids'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { collectCeremonyTracks } from '../lib/ceremonyTracks'
-import { isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
+import { isBuiltInPhotoId, isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
+import {
+  importNatureLibrary,
+  natureIdsForTheme,
+  natureThemeLabels,
+  natureThemeOrder,
+  type NatureTheme,
+} from '../lib/naturePhotoLibrary'
 import { formatDuration, resolveAudioDuration } from '../lib/audioDuration'
 import TextLibraryModal from '../components/TextLibraryModal'
 import PoemLibraryModal from '../components/PoemLibraryModal'
@@ -54,7 +61,10 @@ export default function CeremonyEditor() {
     () => allTracks.filter((t) => isBuiltInTrackId(t.id) || t.ceremonyId === id),
     [allTracks, id],
   )
-  const photos = useMemo(() => allPhotos.filter((p) => p.ceremonyId === id), [allPhotos, id])
+  const photos = useMemo(
+    () => allPhotos.filter((p) => p.ceremonyId === id || isBuiltInPhotoId(p.id)),
+    [allPhotos, id],
+  )
   const ownTracks = useMemo(() => tracks.filter((t) => !isBuiltInTrackId(t.id)), [tracks])
 
   // Filtré uniquement pour les sélecteurs (affectation d'un morceau) — les
@@ -138,6 +148,26 @@ export default function CeremonyEditor() {
       ? draft.slideshow.photoIds.filter((p) => p !== photoId)
       : [...draft.slideshow.photoIds, photoId]
     update({ slideshow: { ...draft.slideshow, photoIds } })
+  }
+
+  const [addingNatureTheme, setAddingNatureTheme] = useState<NatureTheme | null>(null)
+
+  async function addNatureThemeToSlideshow(theme: NatureTheme) {
+    if (!draft) return
+    setAddingNatureTheme(theme)
+    try {
+      // Génère la bibliothèque nature à la volée si ce n'est pas déjà fait — évite un
+      // détour obligatoire par la page de gestion avant de pouvoir s'en servir.
+      await importNatureLibrary()
+      const themeIds = natureIdsForTheme(theme)
+      const photoIds = [
+        ...draft.slideshow.photoIds,
+        ...themeIds.filter((tid) => !draft.slideshow.photoIds.includes(tid)),
+      ]
+      update({ slideshow: { ...draft.slideshow, photoIds } })
+    } finally {
+      setAddingNatureTheme(null)
+    }
   }
 
   function toggleFixedPhoto(photoId: string) {
@@ -638,6 +668,16 @@ export default function CeremonyEditor() {
               />
               Lecture en boucle
             </label>
+            <label className="flex items-center gap-2 text-fg" title="Pratique si la famille n'a pas de préférence particulière sur l'ordre des photos.">
+              <input
+                type="checkbox"
+                checked={draft.slideshow.shuffle ?? false}
+                onChange={(e) =>
+                  update({ slideshow: { ...draft.slideshow, shuffle: e.target.checked } })
+                }
+              />
+              Ordre aléatoire
+            </label>
             <div className="flex items-center gap-2">
               <span className="text-muted">Musique de fond</span>
               <select
@@ -663,8 +703,9 @@ export default function CeremonyEditor() {
             <div className="mb-2 flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted">
-                  {draft.slideshow.photoIds.length} photo(s) sélectionnée(s) — propres à{' '}
-                  {draft.title || 'cette cérémonie'}
+                  {draft.slideshow.photoIds.length} photo(s) sélectionnée(s) — vos imports sont
+                  propres à {draft.title || 'cette cérémonie'}, les visuels 🌿 viennent de la
+                  bibliothèque nature partagée
                 </p>
                 <p className="mt-1 text-xs text-muted">
                   📌 Marquez une photo comme « photo fixe » pour l'afficher seule, sans
@@ -684,6 +725,29 @@ export default function CeremonyEditor() {
                 />
               </label>
             </div>
+
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel-2 p-3">
+              <span className="text-xs text-muted">
+                🌿 Pas de photo de la famille ? Ajoutez un thème nature au diaporama :
+              </span>
+              {natureThemeOrder.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => addNatureThemeToSlideshow(t)}
+                  disabled={addingNatureTheme !== null}
+                  className="rounded-full border border-line px-3 py-1 text-xs text-muted hover:border-gold-dim hover:text-gold disabled:opacity-50"
+                >
+                  {addingNatureTheme === t ? 'Ajout…' : `+ ${natureThemeLabels[t]}`}
+                </button>
+              ))}
+              <button
+                onClick={() => navigate('/photos-nature')}
+                className="ml-auto text-xs text-gold hover:underline"
+              >
+                Gérer la bibliothèque →
+              </button>
+            </div>
+
             {photos.length === 0 ? (
               <p className="rounded-md border border-dashed border-line p-6 text-center text-sm text-muted">
                 Aucune photo importée pour cette cérémonie pour l'instant.
@@ -693,6 +757,7 @@ export default function CeremonyEditor() {
                 {photos.map((p) => {
                   const selected = draft.slideshow.photoIds.includes(p.id)
                   const isFixed = draft.slideshow.fixedPhotoId === p.id
+                  const isShared = isBuiltInPhotoId(p.id)
                   return (
                     <div key={p.id} className="group relative">
                       <button
@@ -702,6 +767,14 @@ export default function CeremonyEditor() {
                         }`}
                       >
                         <PhotoThumb blob={p.blob} />
+                        {isShared && (
+                          <span
+                            className="absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-ink/70 text-[10px]"
+                            title="Photo nature (bibliothèque partagée)"
+                          >
+                            🌿
+                          </span>
+                        )}
                         {selected && (
                           <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[10px] text-ink">
                             {draft.slideshow.photoIds.indexOf(p.id) + 1}
@@ -716,13 +789,15 @@ export default function CeremonyEditor() {
                           </span>
                         )}
                       </button>
-                      <button
-                        onClick={() => removePhoto(p)}
-                        className="absolute left-1 top-1 hidden rounded-full bg-ink/80 px-1.5 py-0.5 text-xs text-danger group-hover:block"
-                        title="Supprimer cette photo"
-                      >
-                        ✕
-                      </button>
+                      {!isShared && (
+                        <button
+                          onClick={() => removePhoto(p)}
+                          className="absolute left-1 top-1 hidden rounded-full bg-ink/80 px-1.5 py-0.5 text-xs text-danger group-hover:block"
+                          title="Supprimer cette photo"
+                        >
+                          ✕
+                        </button>
+                      )}
                       <button
                         onClick={() => toggleFixedPhoto(p.id)}
                         className={`absolute bottom-1 right-1 hidden rounded-full bg-ink/80 px-1.5 py-0.5 text-xs group-hover:block ${

@@ -42,6 +42,8 @@ export interface SlideshowConfig {
    * basculer sur le diaporama, ou à la demande de la famille en cours de cérémonie).
    */
   fixedPhotoId?: string
+  /** Ordre aléatoire — pratique quand la famille n'a pas de préférence particulière. */
+  shuffle?: boolean
 }
 
 export interface CeremonySegment {

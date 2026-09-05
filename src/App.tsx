@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import CeremonyEditor from './pages/CeremonyEditor'
 import Biography from './pages/Biography'
 import MusicLibrary from './pages/MusicLibrary'
+import NaturePhotoLibrary from './pages/NaturePhotoLibrary'
 import LiveMode from './pages/LiveMode'
 import Projector from './pages/Projector'
 import Backup from './pages/Backup'
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/ceremonies/:id" element={<CeremonyEditor />} />
           <Route path="/ceremonies/:id/biographie" element={<Biography />} />
           <Route path="/musique" element={<MusicLibrary />} />
+          <Route path="/photos-nature" element={<NaturePhotoLibrary />} />
           <Route path="/sauvegarde" element={<Backup />} />
           <Route path="/parametres" element={<Settings />} />
         </Route>

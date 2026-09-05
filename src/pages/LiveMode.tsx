@@ -22,6 +22,22 @@ import {
 } from '../lib/audioOutput'
 import { isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
 
+/** Mélange déterministe (même graine → même ordre) : stable pour une cérémonie donnée. */
+function seededShuffle<T>(items: T[], seed: string): T[] {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (Math.imul(h, 31) + seed.charCodeAt(i)) >>> 0
+  const rand = () => {
+    h = (Math.imul(h, 1664525) + 1013904223) >>> 0
+    return h / 4294967296
+  }
+  const arr = [...items]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
 function formatClock(sec: number) {
   if (!Number.isFinite(sec)) return '--:--'
   const m = Math.floor(sec / 60)
@@ -104,7 +120,12 @@ export default function LiveMode() {
   const slidePhotos = useMemo(() => {
     if (!ceremony) return []
     const byId = new Map(allPhotos.map((p) => [p.id, p]))
-    return ceremony.slideshow.photoIds.map((pid) => byId.get(pid)).filter(Boolean) as typeof allPhotos
+    const ordered = ceremony.slideshow.photoIds
+      .map((pid) => byId.get(pid))
+      .filter(Boolean) as typeof allPhotos
+    // Ordre stable (déterministe par cérémonie) plutôt que remélangé à chaque rendu ou
+    // rechargement, pour ne pas désorienter la régie en plein direct.
+    return ceremony.slideshow.shuffle ? seededShuffle(ordered, ceremony.id) : ordered
   }, [ceremony, allPhotos])
 
   const fixedPhoto = useMemo(() => {
