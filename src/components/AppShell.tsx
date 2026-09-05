@@ -4,8 +4,7 @@ import { clearSession, loadSession } from '../lib/licensing/store'
 
 const navItems = [
   { to: '/', label: 'Cérémonies', icon: '🕊️', end: true },
-  { to: '/musique', label: 'Musiques', icon: '🎵' },
-  { to: '/photos', label: 'Photothèque', icon: '🖼️' },
+  { to: '/musique', label: 'Musique libre de droit', icon: '🎵' },
   { to: '/sauvegarde', label: 'Sauvegarde', icon: '💾' },
   { to: '/parametres', label: 'Paramètres', icon: '⚙️' },
 ]

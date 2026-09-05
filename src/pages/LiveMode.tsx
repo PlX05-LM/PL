@@ -85,10 +85,13 @@ export default function LiveMode() {
     [segments, segmentIndex, elapsed, startedAt],
   )
 
-  const selectableTracks = useMemo(
-    () => (appSettings.hideBuiltInLibrary ? tracks.filter((t) => !isBuiltInTrackId(t.id)) : tracks),
-    [tracks, appSettings.hideBuiltInLibrary],
-  )
+  const selectableTracks = useMemo(() => {
+    // Une piste importée n'appartient qu'à la cérémonie pour laquelle elle a été ajoutée.
+    const ownOrBuiltIn = tracks.filter((t) => isBuiltInTrackId(t.id) || t.ceremonyId === id)
+    return appSettings.hideBuiltInLibrary
+      ? ownOrBuiltIn.filter((t) => !isBuiltInTrackId(t.id))
+      : ownOrBuiltIn
+  }, [tracks, appSettings.hideBuiltInLibrary, id])
 
   const libraryTracks = useMemo(() => {
     const q = musicSearch.trim().toLowerCase()

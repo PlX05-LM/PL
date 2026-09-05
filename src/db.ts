@@ -20,6 +20,10 @@ class CeremoniaDB extends Dexie {
       license: 'id',
       accounts: 'id, username',
     })
+    this.version(3).stores({
+      tracks: 'id, name, createdAt, ceremonyId',
+      photos: 'id, name, createdAt, ceremonyId',
+    })
   }
 }
 

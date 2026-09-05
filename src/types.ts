@@ -10,6 +10,13 @@ export interface Track {
   createdAt: number
   /** Renseigné pour les pistes de la bibliothèque libre de droit intégrée. */
   license?: string
+  /**
+   * Cérémonie à laquelle appartient cette piste importée par l'utilisateur — absent pour
+   * les pistes de la bibliothèque libre de droit, qui restent partagées entre toutes les
+   * cérémonies. Une piste importée n'apparaît que dans la cérémonie pour laquelle elle a
+   * été ajoutée, et non dans les suivantes.
+   */
+  ceremonyId?: string
 }
 
 export interface Photo {
@@ -18,6 +25,8 @@ export interface Photo {
   blob: Blob
   mimeType: string
   createdAt: number
+  /** Cérémonie à laquelle appartient cette photo — n'apparaît que dans cette cérémonie. */
+  ceremonyId?: string
 }
 
 export interface SlideshowConfig {

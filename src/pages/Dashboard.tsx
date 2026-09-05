@@ -43,7 +43,10 @@ export default function Dashboard() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Supprimer définitivement cette cérémonie ?')) return
+    if (!confirm('Supprimer définitivement cette cérémonie, ainsi que ses photos et musiques importées ?'))
+      return
+    await db.photos.where('ceremonyId').equals(id).delete()
+    await db.tracks.where('ceremonyId').equals(id).delete()
     await db.ceremonies.delete(id)
   }
 

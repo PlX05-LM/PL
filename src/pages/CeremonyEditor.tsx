@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
@@ -6,13 +6,17 @@ import { newId } from '../lib/ids'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { collectCeremonyTracks } from '../lib/ceremonyTracks'
 import { isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
+import { formatDuration, resolveAudioDuration } from '../lib/audioDuration'
 import TextLibraryModal from '../components/TextLibraryModal'
 import PoemLibraryModal from '../components/PoemLibraryModal'
 import CitationLibraryModal from '../components/CitationLibraryModal'
+import AudioTrimModal from '../components/AudioTrimModal'
 import type {
   Ceremony,
   CeremonySegment,
   CeremonyType,
+  Photo,
+  Track,
   TransitionType,
 } from '../types'
 import { createEmptySegment } from '../types'
@@ -40,9 +44,19 @@ export default function CeremonyEditor() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const ceremony = useLiveQuery(() => (id ? db.ceremonies.get(id) : undefined), [id])
-  const tracks = useLiveQuery(() => db.tracks.orderBy('name').toArray(), []) ?? []
-  const photos = useLiveQuery(() => db.photos.orderBy('createdAt').toArray(), []) ?? []
+  const allTracks = useLiveQuery(() => db.tracks.orderBy('name').toArray(), []) ?? []
+  const allPhotos = useLiveQuery(() => db.photos.orderBy('createdAt').toArray(), []) ?? []
   const appSettings = useMemo(() => loadAppSettings(), [])
+
+  // Une piste/photo importée n'appartient qu'à la cérémonie pour laquelle elle a été
+  // ajoutée — seule la bibliothèque libre de droit est partagée entre toutes les cérémonies.
+  const tracks = useMemo(
+    () => allTracks.filter((t) => isBuiltInTrackId(t.id) || t.ceremonyId === id),
+    [allTracks, id],
+  )
+  const photos = useMemo(() => allPhotos.filter((p) => p.ceremonyId === id), [allPhotos, id])
+  const ownTracks = useMemo(() => tracks.filter((t) => !isBuiltInTrackId(t.id)), [tracks])
+
   // Filtré uniquement pour les sélecteurs (affectation d'un morceau) — les
   // pistes déjà affectées restent résolues normalement (export PDF/ZIP,
   // lecture) même si la bibliothèque libre de droit est masquée.
@@ -125,6 +139,104 @@ export default function CeremonyEditor() {
       : [...draft.slideshow.photoIds, photoId]
     update({ slideshow: { ...draft.slideshow, photoIds } })
   }
+
+  const [importingPhotos, setImportingPhotos] = useState(false)
+
+  async function handleImportPhotos(files: FileList | null) {
+    if (!files || files.length === 0 || !draft) return
+    setImportingPhotos(true)
+    let i = 0
+    for (const file of Array.from(files)) {
+      const photo: Photo = {
+        id: newId(),
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        blob: file,
+        mimeType: file.type || 'image/jpeg',
+        createdAt: Date.now() + i,
+        ceremonyId: draft.id,
+      }
+      await db.photos.add(photo)
+      i += 1
+    }
+    setImportingPhotos(false)
+  }
+
+  async function removePhoto(photo: Photo) {
+    if (!confirm(`Supprimer "${photo.name}" ?`)) return
+    if (draft?.slideshow.photoIds.includes(photo.id)) togglePhoto(photo.id)
+    await db.photos.delete(photo.id)
+  }
+
+  const [importingTracks, setImportingTracks] = useState(false)
+
+  async function handleImportTracks(files: FileList | null) {
+    if (!files || files.length === 0 || !draft) return
+    setImportingTracks(true)
+    for (const file of Array.from(files)) {
+      const duration = await new Promise<number | undefined>((resolve) => {
+        const url = URL.createObjectURL(file)
+        const audio = new Audio(url)
+        audio.addEventListener('loadedmetadata', async () => {
+          const d = await resolveAudioDuration(audio)
+          resolve(Number.isFinite(d) ? d : undefined)
+          URL.revokeObjectURL(url)
+        })
+        audio.addEventListener('error', () => {
+          resolve(undefined)
+          URL.revokeObjectURL(url)
+        })
+      })
+      const track: Track = {
+        id: newId(),
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        blob: file,
+        mimeType: file.type || 'audio/mpeg',
+        duration,
+        createdAt: Date.now(),
+        ceremonyId: draft.id,
+      }
+      await db.tracks.add(track)
+    }
+    setImportingTracks(false)
+  }
+
+  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null)
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null)
+
+  function toggleTrackPreview(track: Track) {
+    if (playingTrackId === track.id) {
+      previewAudioRef.current?.pause()
+      setPlayingTrackId(null)
+      return
+    }
+    previewAudioRef.current?.pause()
+    const audio = new Audio(URL.createObjectURL(track.blob))
+    audio.play()
+    audio.onended = () => setPlayingTrackId(null)
+    previewAudioRef.current = audio
+    setPlayingTrackId(track.id)
+  }
+
+  async function removeTrack(track: Track) {
+    if (!confirm(`Supprimer "${track.name}" ?`)) return
+    if (playingTrackId === track.id) previewAudioRef.current?.pause()
+    if (draft?.slideshow.trackId === track.id) {
+      update({ slideshow: { ...draft.slideshow, trackId: undefined } })
+    }
+    draft?.segments
+      .filter((s) => s.trackId === track.id)
+      .forEach((s) => updateSegment(s.id, { trackId: undefined }))
+    await db.tracks.delete(track.id)
+  }
+
+  const [trimmingTrack, setTrimmingTrack] = useState<Track | null>(null)
+
+  useEffect(() => {
+    return () => {
+      previewAudioRef.current?.pause()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const totalMinutes = useMemo(
     () => draft?.segments.reduce((sum, s) => sum + (s.estimatedDuration || 0), 0) ?? 0,
@@ -277,6 +389,63 @@ export default function CeremonyEditor() {
             className={inputClass()}
           />
         </Field>
+      </section>
+
+      <section className="mt-8 rounded-lg border border-line bg-panel p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h3 className="font-display text-lg text-fg">Musiques de cette cérémonie</h3>
+            <p className="mt-1 text-xs text-muted">
+              Propres à {draft.title || 'cette cérémonie'} : elles n'apparaîtront pas dans les
+              autres cérémonies. La bibliothèque libre de droit reste disponible partout.
+            </p>
+          </div>
+          <label className="shrink-0 cursor-pointer whitespace-nowrap rounded-md border border-line px-3 py-2 text-xs text-muted hover:border-gold-dim hover:text-gold">
+            {importingTracks ? 'Import…' : '+ Importer des musiques'}
+            <input
+              type="file"
+              accept="audio/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleImportTracks(e.target.files)}
+            />
+          </label>
+        </div>
+        {ownTracks.length > 0 && (
+          <ul className="divide-y divide-line rounded-md border border-line bg-panel-2">
+            {ownTracks.map((t) => (
+              <li key={t.id} className="flex items-center gap-3 px-3 py-2">
+                <button
+                  onClick={() => toggleTrackPreview(t)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gold-dim text-xs text-gold hover:bg-panel"
+                >
+                  {playingTrackId === t.id ? '❚❚' : '▶'}
+                </button>
+                <span className="flex-1 truncate text-sm text-fg">{t.name}</span>
+                <span className="text-xs text-muted">{formatDuration(t.duration)}</span>
+                <button
+                  onClick={() => {
+                    if (playingTrackId === t.id) {
+                      previewAudioRef.current?.pause()
+                      setPlayingTrackId(null)
+                    }
+                    setTrimmingTrack(t)
+                  }}
+                  title="Couper les passages indésirables"
+                  className="text-xs text-muted hover:text-fg"
+                >
+                  ✂️ Couper
+                </button>
+                <button
+                  onClick={() => removeTrack(t)}
+                  className="text-xs text-muted hover:text-danger"
+                >
+                  Supprimer
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="mt-8">
@@ -487,38 +656,51 @@ export default function CeremonyEditor() {
           <div className="mt-5">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-sm text-muted">
-                {draft.slideshow.photoIds.length} photo(s) sélectionnée(s)
+                {draft.slideshow.photoIds.length} photo(s) sélectionnée(s) — propres à{' '}
+                {draft.title || 'cette cérémonie'}
               </p>
-              <button
-                onClick={() => navigate('/photos')}
-                className="text-xs text-gold hover:underline"
-              >
-                Importer des photos →
-              </button>
+              <label className="cursor-pointer whitespace-nowrap rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold">
+                {importingPhotos ? 'Import…' : '+ Importer des photos'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleImportPhotos(e.target.files)}
+                />
+              </label>
             </div>
             {photos.length === 0 ? (
               <p className="rounded-md border border-dashed border-line p-6 text-center text-sm text-muted">
-                Aucune photo dans la photothèque pour l'instant.
+                Aucune photo importée pour cette cérémonie pour l'instant.
               </p>
             ) : (
               <div className="grid grid-cols-6 gap-2">
                 {photos.map((p) => {
                   const selected = draft.slideshow.photoIds.includes(p.id)
                   return (
-                    <button
-                      key={p.id}
-                      onClick={() => togglePhoto(p.id)}
-                      className={`relative aspect-square overflow-hidden rounded-md border-2 ${
-                        selected ? 'border-gold' : 'border-transparent'
-                      }`}
-                    >
-                      <PhotoThumb blob={p.blob} />
-                      {selected && (
-                        <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[10px] text-ink">
-                          {draft.slideshow.photoIds.indexOf(p.id) + 1}
-                        </span>
-                      )}
-                    </button>
+                    <div key={p.id} className="group relative">
+                      <button
+                        onClick={() => togglePhoto(p.id)}
+                        className={`relative aspect-square w-full overflow-hidden rounded-md border-2 ${
+                          selected ? 'border-gold' : 'border-transparent'
+                        }`}
+                      >
+                        <PhotoThumb blob={p.blob} />
+                        {selected && (
+                          <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[10px] text-ink">
+                            {draft.slideshow.photoIds.indexOf(p.id) + 1}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => removePhoto(p)}
+                        className="absolute left-1 top-1 hidden rounded-full bg-ink/80 px-1.5 py-0.5 text-xs text-danger group-hover:block"
+                        title="Supprimer cette photo"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   )
                 })}
               </div>
@@ -526,6 +708,8 @@ export default function CeremonyEditor() {
           </div>
         </div>
       </section>
+
+      {trimmingTrack && <AudioTrimModal track={trimmingTrack} onClose={() => setTrimmingTrack(null)} />}
 
       {textLibraryForSegment && (
         <TextLibraryModal
