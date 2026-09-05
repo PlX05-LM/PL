@@ -112,9 +112,37 @@ export default function CeremonyEditor() {
     update({ segments })
   }
 
+  const [deletedSegment, setDeletedSegment] = useState<{
+    segment: CeremonySegment
+    index: number
+  } | null>(null)
+  const deletedSegmentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (deletedSegmentTimerRef.current) clearTimeout(deletedSegmentTimerRef.current)
+    }
+  }, [])
+
   function removeSegment(segId: string) {
     if (!draft) return
+    const index = draft.segments.findIndex((s) => s.id === segId)
+    if (index === -1) return
+    const segment = draft.segments[index]
     update({ segments: draft.segments.filter((s) => s.id !== segId) })
+
+    if (deletedSegmentTimerRef.current) clearTimeout(deletedSegmentTimerRef.current)
+    setDeletedSegment({ segment, index })
+    deletedSegmentTimerRef.current = setTimeout(() => setDeletedSegment(null), 8000)
+  }
+
+  function undoRemoveSegment() {
+    if (!draft || !deletedSegment) return
+    const segments = [...draft.segments]
+    segments.splice(deletedSegment.index, 0, deletedSegment.segment)
+    update({ segments })
+    if (deletedSegmentTimerRef.current) clearTimeout(deletedSegmentTimerRef.current)
+    setDeletedSegment(null)
   }
 
   function moveSegment(index: number, dir: -1 | 1) {
@@ -896,6 +924,20 @@ export default function CeremonyEditor() {
           onInsert={(text) => insertText(citationLibraryForSegment, text)}
           onClose={() => setCitationLibraryForSegment(null)}
         />
+      )}
+
+      {deletedSegment && (
+        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-gold-dim bg-panel px-4 py-3 shadow-lg">
+          <span className="text-sm text-fg">
+            Étape « {deletedSegment.segment.title || 'Sans titre'} » supprimée
+          </span>
+          <button
+            onClick={undoRemoveSegment}
+            className="shrink-0 rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-dim"
+          >
+            ↺ Annuler
+          </button>
+        </div>
       )}
     </div>
   )
