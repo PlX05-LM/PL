@@ -46,8 +46,3 @@ export function saveAppSettings(settings: AppSettings) {
 export function isBuiltInTrackId(id: string): boolean {
   return id.startsWith('builtin-')
 }
-
-/** Photo de la bibliothèque nature générée (partagée entre toutes les cérémonies). */
-export function isBuiltInPhotoId(id: string): boolean {
-  return id.startsWith('builtin-nature-')
-}
