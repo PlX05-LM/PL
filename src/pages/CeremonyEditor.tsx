@@ -140,6 +140,12 @@ export default function CeremonyEditor() {
     update({ slideshow: { ...draft.slideshow, photoIds } })
   }
 
+  function toggleFixedPhoto(photoId: string) {
+    if (!draft) return
+    const fixedPhotoId = draft.slideshow.fixedPhotoId === photoId ? undefined : photoId
+    update({ slideshow: { ...draft.slideshow, fixedPhotoId } })
+  }
+
   const [importingPhotos, setImportingPhotos] = useState(false)
 
   async function handleImportPhotos(files: FileList | null) {
@@ -655,11 +661,19 @@ export default function CeremonyEditor() {
 
           <div className="mt-5">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm text-muted">
-                {draft.slideshow.photoIds.length} photo(s) sélectionnée(s) — propres à{' '}
-                {draft.title || 'cette cérémonie'}
-              </p>
-              <label className="cursor-pointer whitespace-nowrap rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold">
+              <div>
+                <p className="text-sm text-muted">
+                  {draft.slideshow.photoIds.length} photo(s) sélectionnée(s) — propres à{' '}
+                  {draft.title || 'cette cérémonie'}
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  📌 Marquez une photo comme « photo fixe » pour l'afficher seule, sans
+                  diaporama — utile en introduction ou si la famille demande d'y revenir en
+                  cours de cérémonie. Bascule disponible dans le panneau Diaporama de la régie
+                  live.
+                </p>
+              </div>
+              <label className="shrink-0 cursor-pointer whitespace-nowrap rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold">
                 {importingPhotos ? 'Import…' : '+ Importer des photos'}
                 <input
                   type="file"
@@ -678,18 +692,27 @@ export default function CeremonyEditor() {
               <div className="grid grid-cols-6 gap-2">
                 {photos.map((p) => {
                   const selected = draft.slideshow.photoIds.includes(p.id)
+                  const isFixed = draft.slideshow.fixedPhotoId === p.id
                   return (
                     <div key={p.id} className="group relative">
                       <button
                         onClick={() => togglePhoto(p.id)}
                         className={`relative aspect-square w-full overflow-hidden rounded-md border-2 ${
-                          selected ? 'border-gold' : 'border-transparent'
+                          isFixed ? 'border-sky-400' : selected ? 'border-gold' : 'border-transparent'
                         }`}
                       >
                         <PhotoThumb blob={p.blob} />
                         {selected && (
                           <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[10px] text-ink">
                             {draft.slideshow.photoIds.indexOf(p.id) + 1}
+                          </span>
+                        )}
+                        {isFixed && (
+                          <span
+                            className="absolute bottom-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-sky-400 text-[10px]"
+                            title="Photo fixe de cette cérémonie"
+                          >
+                            📌
                           </span>
                         )}
                       </button>
@@ -699,6 +722,15 @@ export default function CeremonyEditor() {
                         title="Supprimer cette photo"
                       >
                         ✕
+                      </button>
+                      <button
+                        onClick={() => toggleFixedPhoto(p.id)}
+                        className={`absolute bottom-1 right-1 hidden rounded-full bg-ink/80 px-1.5 py-0.5 text-xs group-hover:block ${
+                          isFixed ? 'text-sky-400' : 'text-muted hover:text-fg'
+                        }`}
+                        title={isFixed ? 'Retirer comme photo fixe' : 'Définir comme photo fixe'}
+                      >
+                        📌
                       </button>
                     </div>
                   )

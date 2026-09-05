@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import type { SlideshowConfig } from '../types'
-import { channelNameFor, type ProjectorMessage, type ProjectorPhoto } from '../lib/projectorChannel'
+import {
+  channelNameFor,
+  type PhotoDisplayMode,
+  type ProjectorMessage,
+  type ProjectorPhoto,
+} from '../lib/projectorChannel'
 
 interface Slide {
   id: string
@@ -17,7 +22,10 @@ export default function Projector() {
   const [connected, setConnected] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showControls, setShowControls] = useState(true)
+  const [mode, setMode] = useState<PhotoDisplayMode>('diaporama')
+  const [fixedUrl, setFixedUrl] = useState<string | null>(null)
   const urlsRef = useRef<string[]>([])
+  const fixedUrlRef = useRef<string | null>(null)
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -29,6 +37,7 @@ export default function Projector() {
         setConnected(true)
         setConfig(msg.config)
         setIndex(msg.index)
+        setMode(msg.mode)
         // rebuild object URLs only when the photo set actually changed
         urlsRef.current.forEach((u) => URL.revokeObjectURL(u))
         const next = msg.photos.map((p: ProjectorPhoto) => ({
@@ -37,6 +46,11 @@ export default function Projector() {
         }))
         urlsRef.current = next.map((s) => s.url)
         setSlides(next)
+
+        if (fixedUrlRef.current) URL.revokeObjectURL(fixedUrlRef.current)
+        const nextFixedUrl = msg.fixedPhoto ? URL.createObjectURL(msg.fixedPhoto.blob) : null
+        fixedUrlRef.current = nextFixedUrl
+        setFixedUrl(nextFixedUrl)
       } else if (msg.type === 'black') {
         setBlack(msg.on)
       }
@@ -45,6 +59,7 @@ export default function Projector() {
     return () => {
       channel.close()
       urlsRef.current.forEach((u) => URL.revokeObjectURL(u))
+      if (fixedUrlRef.current) URL.revokeObjectURL(fixedUrlRef.current)
     }
   }, [id])
 
@@ -96,6 +111,12 @@ export default function Projector() {
         </div>
       )}
 
+      {connected && mode === 'fixe' && !fixedUrl && (
+        <div className="flex h-full w-full items-center justify-center text-lg text-zinc-500">
+          Aucune photo fixe définie pour cette cérémonie.
+        </div>
+      )}
+
       <button
         onClick={toggleFullscreen}
         className={`absolute bottom-4 right-4 z-10 rounded-md border border-white/20 bg-black/60 px-3 py-2 text-xs text-white/80 backdrop-blur transition-opacity hover:opacity-100 ${
@@ -105,7 +126,17 @@ export default function Projector() {
         {isFullscreen ? '⤢ Quitter le plein écran' : '⛶ Plein écran'}
       </button>
 
-      {connected &&
+      {connected && mode === 'fixe' && fixedUrl && (
+        <div className="absolute inset-0">
+          <div
+            className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl brightness-50"
+            style={{ backgroundImage: `url(${fixedUrl})` }}
+          />
+          <img src={fixedUrl} alt="" className="relative h-full w-full object-contain" />
+        </div>
+      )}
+
+      {connected && mode === 'diaporama' &&
         slides.map((s, i) => (
           <div
             key={s.id}

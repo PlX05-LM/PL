@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import { channelNameFor, type ProjectorMessage } from '../lib/projectorChannel'
+import { channelNameFor, type PhotoDisplayMode, type ProjectorMessage } from '../lib/projectorChannel'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { resolveAudioDuration } from '../lib/audioDuration'
 import { computePace, paceLabel } from '../lib/pace'
@@ -61,6 +61,7 @@ export default function LiveMode() {
   const [slideIndex, setSlideIndex] = useState(0)
   const [slidesPlaying, setSlidesPlaying] = useState(false)
   const [blackout, setBlackout] = useState(false)
+  const [photoMode, setPhotoMode] = useState<PhotoDisplayMode>('diaporama')
   const channelRef = useRef<BroadcastChannel | null>(null)
   const projectorWindowRef = useRef<Window | null>(null)
 
@@ -106,6 +107,11 @@ export default function LiveMode() {
     return ceremony.slideshow.photoIds.map((pid) => byId.get(pid)).filter(Boolean) as typeof allPhotos
   }, [ceremony, allPhotos])
 
+  const fixedPhoto = useMemo(() => {
+    const fixedPhotoId = ceremony?.slideshow.fixedPhotoId
+    return fixedPhotoId ? allPhotos.find((p) => p.id === fixedPhotoId) ?? null : null
+  }, [ceremony, allPhotos])
+
   // --- Reprise après rechargement/plantage : on restaure l'état une seule fois au chargement ---
   useEffect(() => {
     if (!ceremony || liveStateHydrated) return
@@ -115,13 +121,23 @@ export default function LiveMode() {
       setStartedAt(ls.startedAt)
       setSlideIndex(ls.slideIndex)
       setBlackout(ls.blackout)
+      setPhotoMode(ls.photoMode ?? 'diaporama')
       if (ls.startedAt !== null) setResumed(true)
     }
     setLiveStateHydrated(true)
   }, [ceremony, liveStateHydrated])
 
   const persistLiveState = useDebouncedCallback(
-    (id: string, state: { segmentIndex: number; startedAt: number | null; slideIndex: number; blackout: boolean }) => {
+    (
+      id: string,
+      state: {
+        segmentIndex: number
+        startedAt: number | null
+        slideIndex: number
+        blackout: boolean
+        photoMode: PhotoDisplayMode
+      },
+    ) => {
       db.ceremonies.update(id, { liveState: state, updatedAt: Date.now() })
     },
     400,
@@ -129,9 +145,9 @@ export default function LiveMode() {
 
   useEffect(() => {
     if (!liveStateHydrated || !id) return
-    persistLiveState(id, { segmentIndex, startedAt, slideIndex, blackout })
+    persistLiveState(id, { segmentIndex, startedAt, slideIndex, blackout, photoMode })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveStateHydrated, id, segmentIndex, startedAt, slideIndex, blackout])
+  }, [liveStateHydrated, id, segmentIndex, startedAt, slideIndex, blackout, photoMode])
 
   // --- Elapsed time chrono ---
   useEffect(() => {
@@ -314,6 +330,8 @@ export default function LiveMode() {
       photos: slidePhotos.map((p) => ({ id: p.id, blob: p.blob })),
       index: slideIndex,
       playing: slidesPlaying,
+      mode: photoMode,
+      fixedPhoto: fixedPhoto ? { id: fixedPhoto.id, blob: fixedPhoto.blob } : null,
     } satisfies ProjectorMessage)
   }
 
@@ -340,7 +358,7 @@ export default function LiveMode() {
   useEffect(() => {
     sendProjectorState()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ceremony?.slideshow, slidePhotos, slideIndex, slidesPlaying])
+  }, [ceremony?.slideshow, slidePhotos, slideIndex, slidesPlaying, photoMode, fixedPhoto])
 
   useEffect(() => {
     channelRef.current?.postMessage({ type: 'black', on: blackout } satisfies ProjectorMessage)
@@ -376,6 +394,9 @@ export default function LiveMode() {
   function toggleSlideshowPlaying() {
     setSlidesPlaying((p) => !p)
   }
+  function togglePhotoModeState() {
+    setPhotoMode((m) => (m === 'diaporama' ? 'fixe' : 'diaporama'))
+  }
   function toggleBlackoutState() {
     setBlackout((b) => !b)
   }
@@ -394,6 +415,7 @@ export default function LiveMode() {
     nextSlide: goToNextSlide,
     prevSlide: goToPrevSlide,
     toggleSlideshow: toggleSlideshowPlaying,
+    togglePhotoMode: togglePhotoModeState,
     toggleBlackout: toggleBlackoutState,
     toggleAutoScroll: toggleAutoScrollState,
     startChrono: startChronoIfNeeded,
@@ -777,10 +799,34 @@ export default function LiveMode() {
                 {slidePhotos.length > 0 ? `${slideIndex + 1}/${slidePhotos.length}` : '0/0'}
               </span>
             </div>
-            {slidePhotos[slideIndex] && (
-              <div className="mb-2 aspect-video overflow-hidden rounded-md border border-line bg-black">
-                <PhotoPreview blob={slidePhotos[slideIndex].blob} />
+
+            <button
+              onClick={togglePhotoModeState}
+              disabled={photoMode === 'diaporama' && !fixedPhoto}
+              title={
+                photoMode === 'diaporama' && !fixedPhoto
+                  ? "Aucune photo fixe définie pour cette cérémonie (à marquer dans l'éditeur de cérémonie)"
+                  : undefined
+              }
+              className={`mb-2 w-full rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
+                photoMode === 'fixe'
+                  ? 'border-sky-400 text-sky-400 hover:bg-panel-2'
+                  : 'border-line text-muted hover:text-fg'
+              }`}
+            >
+              {photoMode === 'fixe' ? '🎞️ Rebasculer sur le diaporama' : '📌 Afficher la photo fixe'}
+            </button>
+
+            {photoMode === 'fixe' ? (
+              <div className="mb-2 aspect-video overflow-hidden rounded-md border border-sky-400 bg-black">
+                {fixedPhoto && <PhotoPreview blob={fixedPhoto.blob} />}
               </div>
+            ) : (
+              slidePhotos[slideIndex] && (
+                <div className="mb-2 aspect-video overflow-hidden rounded-md border border-line bg-black">
+                  <PhotoPreview blob={slidePhotos[slideIndex].blob} />
+                </div>
+              )
             )}
             <div className="flex items-center gap-2">
               <button

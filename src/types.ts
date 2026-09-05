@@ -37,6 +37,11 @@ export interface SlideshowConfig {
   kenBurns: boolean
   loop: boolean
   trackId?: string
+  /**
+   * Photo unique affichée à la place du diaporama (ex. en introduction, avant de
+   * basculer sur le diaporama, ou à la demande de la famille en cours de cérémonie).
+   */
+  fixedPhotoId?: string
 }
 
 export interface CeremonySegment {
@@ -101,6 +106,7 @@ export interface LiveState {
   startedAt: number | null
   slideIndex: number
   blackout: boolean
+  photoMode: 'diaporama' | 'fixe'
 }
 
 export interface Ceremony {

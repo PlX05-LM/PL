@@ -6,6 +6,7 @@ export type RemoteAction =
   | 'nextSlide'
   | 'prevSlide'
   | 'toggleSlideshow'
+  | 'togglePhotoMode'
   | 'toggleBlackout'
   | 'toggleAutoScroll'
   | 'startChrono'
@@ -18,6 +19,7 @@ export const actionOrder: RemoteAction[] = [
   'nextSlide',
   'prevSlide',
   'toggleSlideshow',
+  'togglePhotoMode',
   'toggleBlackout',
   'toggleAutoScroll',
   'startChrono',
@@ -31,6 +33,7 @@ export const actionLabels: Record<RemoteAction, string> = {
   nextSlide: 'Photo suivante',
   prevSlide: 'Photo précédente',
   toggleSlideshow: 'Lecture / pause du diaporama',
+  togglePhotoMode: 'Diaporama / photo fixe (bascule)',
   toggleBlackout: "Écran noir (bascule)",
   toggleAutoScroll: 'Défilement auto du prompteur (bascule)',
   startChrono: 'Démarrer le chronomètre',
@@ -50,6 +53,7 @@ export const defaultKeymap: Keymap = {
   nextSlide: 'ArrowDown',
   prevSlide: 'ArrowUp',
   toggleSlideshow: 'p',
+  togglePhotoMode: 'm',
   toggleBlackout: 'b',
   toggleAutoScroll: 'a',
   startChrono: 's',
