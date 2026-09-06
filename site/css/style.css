@@ -1,15 +1,21 @@
 :root {
-  --bg: #f5f2ec;
-  --bg-alt: #ece3d1;
-  --ink: #0f2238;
-  --ink-soft: #46586b;
-  --line: #e1d8c3;
-  --accent: #c9ae7b;
-  --accent-dark: #a9824b;
-  --accent-soft: #f1e9d8;
-  --navy: #0f2238;
-  --navy-soft: #1a3350;
-  --cream: #f5f2ec;
+  /* Charte graphique — les 3 couleurs officielles */
+  --navy: #0f2238;   /* Bleu nuit profond */
+  --gold: #c9ae7b;   /* Or champagne */
+  --cream: #f5f2ec;  /* Blanc cassé */
+
+  /* Toutes les autres teintes ci-dessous sont ces 3 couleurs mélangées
+     entre elles (jamais une nouvelle couleur) : ombres, fonds alternés,
+     bordures et états de survol. */
+  --bg: var(--cream);
+  --bg-alt: color-mix(in srgb, var(--cream) 90%, var(--navy) 10%);
+  --ink: var(--navy);
+  --ink-soft: color-mix(in srgb, var(--navy) 72%, var(--cream) 28%);
+  --line: color-mix(in srgb, var(--navy) 22%, var(--cream) 78%);
+  --accent: var(--gold);
+  --accent-dark: color-mix(in srgb, var(--gold) 60%, var(--navy) 40%);
+  --accent-soft: color-mix(in srgb, var(--gold) 16%, var(--cream) 84%);
+
   --serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --max: 1080px;
