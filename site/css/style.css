@@ -4,17 +4,17 @@
   --gold: #c9ae7b;   /* Or champagne */
   --cream: #f5f2ec;  /* Blanc cassé */
 
-  /* Toutes les autres teintes ci-dessous sont ces 3 couleurs mélangées
-     entre elles (jamais une nouvelle couleur) : ombres, fonds alternés,
-     bordures et états de survol. */
-  --bg: var(--cream);
-  --bg-alt: color-mix(in srgb, var(--cream) 90%, var(--navy) 10%);
-  --ink: var(--navy);
-  --ink-soft: color-mix(in srgb, var(--navy) 72%, var(--cream) 28%);
-  --line: color-mix(in srgb, var(--navy) 22%, var(--cream) 78%);
+  /* Thème sombre : le bleu nuit devient le fond principal du site, comme
+     sur le logo. Toutes les teintes ci-dessous restent ces 3 couleurs
+     mélangées entre elles (jamais une nouvelle couleur) : fonds alternés,
+     surfaces (cartes, badges), bordures et texte secondaire. */
+  --bg: var(--navy);
+  --bg-alt: color-mix(in srgb, var(--navy) 90%, var(--cream) 10%);
+  --ink: var(--cream);
+  --ink-soft: color-mix(in srgb, var(--cream) 70%, var(--navy) 30%);
+  --line: color-mix(in srgb, var(--cream) 16%, var(--navy) 84%);
   --accent: var(--gold);
-  --accent-dark: color-mix(in srgb, var(--gold) 60%, var(--navy) 40%);
-  --accent-soft: color-mix(in srgb, var(--gold) 16%, var(--cream) 84%);
+  --accent-soft: color-mix(in srgb, var(--gold) 16%, var(--navy) 84%);
 
   --serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -52,7 +52,7 @@ h1, h2, h3 {
   line-height: 1.25;
 }
 
-a { color: var(--accent-dark); }
+a { color: var(--accent); }
 
 /* Header */
 
@@ -60,7 +60,7 @@ a { color: var(--accent-dark); }
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(250, 248, 244, 0.92);
+  background: rgba(15, 34, 56, 0.92);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--line);
 }
@@ -111,23 +111,26 @@ a { color: var(--accent-dark); }
   right: 100%;
   bottom: -4px;
   height: 1px;
-  background: var(--accent-dark);
+  background: var(--accent);
   transition: right 0.25s ease;
 }
 
 .primary-nav a:not(.nav-cta):hover::after { right: 0; }
 
-.primary-nav a:hover { color: var(--accent-dark); }
+.primary-nav a:hover { color: var(--accent); }
 
 .nav-cta {
   padding: 8px 18px;
   border: 1px solid var(--accent);
   border-radius: 999px;
-  color: var(--accent-dark) !important;
-  transition: background 0.15s ease;
+  color: var(--accent) !important;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.nav-cta:hover { background: var(--accent-soft); }
+.nav-cta:hover {
+  background: var(--accent);
+  color: var(--navy) !important;
+}
 
 .nav-toggle {
   display: none;
@@ -168,7 +171,8 @@ a { color: var(--accent-dark); }
   width: 100%;
   max-width: 320px;
   border-radius: 20px;
-  box-shadow: 0 24px 48px -24px rgba(15, 34, 56, 0.4);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 48px -20px rgba(0, 0, 0, 0.55);
 }
 
 /* Entrée du hero (au chargement) */
@@ -222,7 +226,7 @@ html.js .reveal.visible {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 0.8rem;
-  color: var(--accent-dark);
+  color: var(--accent);
   margin-bottom: 18px;
 }
 
@@ -253,7 +257,7 @@ html.js .reveal.visible {
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.btn-primary:hover { background: var(--navy); color: var(--accent); }
+.btn-primary:hover { background: var(--cream); color: var(--navy); }
 
 /* Sections */
 
@@ -299,7 +303,7 @@ html.js .reveal.visible {
 }
 
 .card {
-  background: #fff;
+  background: var(--accent-soft);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 32px 28px;
@@ -308,7 +312,7 @@ html.js .reveal.visible {
 
 .card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 20px 32px -22px rgba(15, 34, 56, 0.28);
+  box-shadow: 0 20px 32px -22px rgba(0, 0, 0, 0.5);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -318,7 +322,7 @@ html.js .reveal.visible {
 .card h3 {
   margin: 0 0 14px;
   font-size: 1.2rem;
-  color: var(--accent-dark);
+  color: var(--accent);
 }
 
 .card p {
@@ -349,7 +353,7 @@ html.js .reveal.visible {
   height: 44px;
   border-radius: 50%;
   background: var(--accent-soft);
-  color: var(--accent-dark);
+  color: var(--accent);
   font-family: var(--serif);
   font-size: 1.1rem;
   display: flex;
@@ -374,7 +378,7 @@ html.js .reveal.visible {
   border: 1px dashed var(--accent);
   border-radius: 10px;
   padding: 20px 24px;
-  color: var(--accent-dark);
+  color: var(--ink-soft);
 }
 
 .legal-content { max-width: 700px; }
