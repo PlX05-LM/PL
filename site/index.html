@@ -7,6 +7,7 @@
 <title>Paul Funéraire — Maître de cérémonie indépendant</title>
 <meta name="description" content="Maître de cérémonie indépendant en Manche et Calvados. Accompagnement personnalisé pour cérémonies laïques, religieuses et au crématorium.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -176,23 +177,19 @@
   </section>
 
   <section id="zone" class="section zone">
-    <div class="wrap two-col">
-      <div class="col-text reveal">
-        <h2>Zone d'intervention</h2>
-        <p>
-          J'interviens principalement dans la <strong>Manche</strong> et le <strong>Calvados</strong>,
-          de Saint-Lô à Caen, en passant par Cherbourg, Coutances ou Bayeux — et au-delà selon les
-          situations, n'hésitez pas à me contacter pour en discuter.
-        </p>
-      </div>
-      <div class="col-illustration reveal" aria-hidden="true">
-        <svg viewBox="0 0 200 160" class="illu">
-          <circle cx="70" cy="80" r="6" fill="currentColor"/>
-          <circle cx="130" cy="70" r="6" fill="currentColor"/>
-          <circle cx="100" cy="110" r="4" fill="currentColor" opacity="0.6"/>
-          <path d="M70 80 L130 70 L100 110 Z" fill="none" stroke="currentColor" stroke-width="1" opacity="0.5"/>
-        </svg>
-      </div>
+    <div class="wrap">
+      <h2 class="section-title reveal">Zone d'intervention</h2>
+      <p class="section-lead reveal">
+        Basé à <strong>Saint-Hilaire-du-Harcouët</strong>, j'interviens dans tout le sud de la
+        <strong>Manche</strong> et le <strong>Calvados</strong>, jusqu'à Pontorson et Aunay-sur-Odon
+        environ — et au-delà selon les situations, n'hésitez pas à me contacter pour en discuter.
+      </p>
+      <div
+        id="zone-map"
+        class="zone-map reveal"
+        role="img"
+        aria-label="Carte de la zone d'intervention : basé à Saint-Hilaire-du-Harcouët, couvrant le sud de la Manche jusqu'à Pontorson et le Calvados jusqu'à Aunay-sur-Odon"
+      ></div>
     </div>
   </section>
 
@@ -215,6 +212,8 @@
   </div>
 </footer>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="js/zone-map.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
