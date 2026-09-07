@@ -205,6 +205,8 @@ html.js .reveal.visible {
 .cards .reveal:nth-child(2) { transition-delay: 0.1s; }
 .cards .reveal:nth-child(3) { transition-delay: 0.2s; }
 
+.venues .reveal:nth-child(2) { transition-delay: 0.1s; }
+
 .steps li.reveal:nth-child(2) { transition-delay: 0.08s; }
 .steps li.reveal:nth-child(3) { transition-delay: 0.16s; }
 .steps li.reveal:nth-child(4) { transition-delay: 0.24s; }
@@ -328,6 +330,54 @@ html.js .reveal.visible {
   font-size: 0.96rem;
 }
 
+/* Lieux de cérémonie */
+
+.venues {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+.venue {
+  margin: 0;
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.venue:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 32px -22px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .venue:hover { transform: none; }
+}
+
+.venue img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.venue figcaption { padding: 24px 28px; }
+
+.venue-label {
+  margin: 0 0 8px;
+  font-family: var(--serif);
+  color: var(--accent);
+  font-size: 1.05rem;
+}
+
+.venue figcaption p:last-child {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.96rem;
+}
+
 /* Steps */
 
 .steps {
@@ -432,6 +482,7 @@ html.js .reveal.visible {
   .hero-logo { order: -1; }
   .hero-logo-img { max-width: 200px; }
   .cards { grid-template-columns: 1fr; }
+  .venues { grid-template-columns: 1fr; }
   .col-illustration { order: -1; max-width: 160px; margin: 0 auto 24px; }
 
   .nav-toggle { display: flex; }
