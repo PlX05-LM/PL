@@ -4,25 +4,18 @@
 
   var base = [48.579, -1.098]; // Saint-Hilaire-du-Harcouët
 
-  // Contour approximatif de la zone d'intervention, d'après les repères
-  // fournis (villes citées le long du tracé), dans le sens horaire.
+  // Contour de la zone d'intervention : un rectangle aux coins arrondis
+  // calé sur les repères du tracé fourni (Caen au nord-est, la forêt des
+  // Andaines/Bagnoles-de-l'Orne à l'est, Fougères au sud, Granville et la
+  // côte à l'ouest, jusqu'au sud du Cotentin au nord), dans le sens horaire.
   var zone = [
-    [49.20, -1.58], // Saint-Germain-sur-Ay
-    [49.22, -0.35], // Blainville-sur-Orne (nord de Caen)
-    [49.14, -0.35], // Ifs / sud de Caen
-    [49.02, -0.47], // Thury-Harcourt-le-Hom
-    [48.75, -0.57], // Flers / Athis-Val de Rouvre
-    [48.60, -0.37], // La Ferté-Macé / Bagnoles-de-l'Orne
-    [48.48, -0.55], // Lassay-les-Châteaux
-    [48.43, -0.80], // Gorron / Ambrières-les-Vallées
-    [48.35, -1.20], // vers Fougères (pointe sud)
-    [48.45, -1.32], // Val-Couesnon / Maen Roch
-    [48.55, -1.51], // Pontorson
-    [48.64, -1.51], // Mont-Saint-Michel / Roz-sur-Couesnon
-    [48.84, -1.60], // Granville
-    [49.05, -1.59], // Agon-Coutainville
-    [49.10, -1.56], // Gouville-sur-Mer
-    [49.19, -1.57], // Pirou
+    [49.19, -1.62], [49.1486, -1.6117], [49.11, -1.5874], [49.0769, -1.5488],
+    [49.0514, -1.4984], [49.0355, -1.4398], [49.03, -1.3769], [49.03, -0.5631],
+    [49.0355, -0.5002], [49.0514, -0.4416], [49.0769, -0.3912], [49.11, -0.3526],
+    [49.1486, -0.3283], [49.19, -0.32], [48.51, -0.32], [48.5514, -0.3283],
+    [48.59, -0.3526], [48.6231, -0.3912], [48.6486, -0.4416], [48.6645, -0.5002],
+    [48.67, -0.5631], [48.67, -1.3769], [48.6645, -1.4398], [48.6486, -1.4984],
+    [48.6231, -1.5488], [48.59, -1.5874], [48.5514, -1.6117], [48.51, -1.62],
   ];
 
   var map = L.map(el, { scrollWheelZoom: false });
