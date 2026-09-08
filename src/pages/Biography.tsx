@@ -5,6 +5,7 @@ import { db } from '../db'
 import { newId } from '../lib/ids'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { composeBiographyDraft, hasAnyBiographyContent } from '../lib/biographyComposer'
+import { AiGenerationError, generateBiographyDraftAI, isAiConfigured } from '../lib/aiGeneration'
 import { createEmptyBiography, type Biography, type BiographyChild } from '../types'
 
 const inputClass =
@@ -91,11 +92,31 @@ export default function Biography() {
     update({ anecdotes: bio.anecdotes.filter((_, i) => i !== index) })
   }
 
+  const [generatingAi, setGeneratingAi] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+
   function handleGenerate() {
     if (!bio || !ceremony) return
+    setAiError(null)
     setDraftText(composeBiographyDraft(ceremony.deceasedName, bio))
     setCopied(false)
     setInserted(false)
+  }
+
+  async function handleGenerateAI() {
+    if (!bio || !ceremony) return
+    setGeneratingAi(true)
+    setAiError(null)
+    try {
+      const text = await generateBiographyDraftAI(ceremony.deceasedName, bio)
+      setDraftText(text)
+      setCopied(false)
+      setInserted(false)
+    } catch (err) {
+      setAiError(err instanceof AiGenerationError ? err.message : 'La génération par IA a échoué.')
+    } finally {
+      setGeneratingAi(false)
+    }
   }
 
   async function handleCopy() {
@@ -448,18 +469,44 @@ export default function Biography() {
       <section className="mt-6 rounded-lg border border-gold-dim/50 bg-panel p-5">
         <h3 className="mb-1 font-display text-lg text-fg">Ébauche d'éloge</h3>
         <p className="mb-3 text-xs text-muted">
-          Un premier jet assemblé à partir des informations ci-dessus (pas d'IA, juste un montage
-          de phrases) — à relire, réécrire et personnaliser avant utilisation. Rien n'est
-          automatiquement inséré dans le déroulé.
+          Un premier jet assemblé à partir des informations ci-dessus — à relire, réécrire et
+          personnaliser avant utilisation. Rien n'est automatiquement inséré dans le déroulé.
         </p>
-        <button
-          onClick={handleGenerate}
-          disabled={!canGenerate}
-          className="mb-3 rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink hover:bg-gold-dim disabled:opacity-50"
-          title={canGenerate ? undefined : 'Renseignez au moins une information ci-dessus.'}
-        >
-          ✨ Générer / régénérer l'ébauche
-        </button>
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleGenerate}
+            disabled={!canGenerate}
+            className="rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink hover:bg-gold-dim disabled:opacity-50"
+            title={canGenerate ? undefined : 'Renseignez au moins une information ci-dessus.'}
+          >
+            ✨ Générer / régénérer (local, hors-ligne)
+          </button>
+          <button
+            onClick={handleGenerateAI}
+            disabled={!canGenerate || generatingAi}
+            className="rounded-md border border-gold-dim px-4 py-2 text-sm font-medium text-gold hover:bg-panel-2 disabled:opacity-50"
+            title={
+              !canGenerate
+                ? 'Renseignez au moins une information ci-dessus.'
+                : !isAiConfigured()
+                  ? "À configurer dans Paramètres → Génération de texte par IA"
+                  : undefined
+            }
+          >
+            {generatingAi ? 'Génération…' : '🤖 Générer avec l\'IA (en ligne)'}
+          </button>
+        </div>
+        <p className="mb-3 text-xs text-muted">
+          Le générateur local fonctionne sans connexion, y compris en cimetière hors réseau — c'est
+          un simple montage de phrases, à personnaliser. La génération par IA produit un texte plus
+          librement rédigé, mais nécessite d'être en ligne et d'avoir configuré le service dans
+          Paramètres.
+        </p>
+        {aiError && (
+          <p className="mb-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+            {aiError} Le générateur local ci-dessus reste disponible.
+          </p>
+        )}
 
         {draftText && (
           <>

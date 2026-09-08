@@ -1,0 +1,17 @@
+name = "cerema-ai-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Espace de clé-valeur utilisé pour le comptage de requêtes par adresse IP
+# (protection anti-abus, voir README.md). À créer une fois avec :
+#   npx wrangler kv namespace create RATE_LIMIT
+# puis coller l'id renvoyé ci-dessous.
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "REMPLACER_PAR_L_ID_RENVOYE_PAR_WRANGLER"
+
+# Secrets à définir avec `npx wrangler secret put <NOM>` (jamais dans ce fichier) :
+#   ANTHROPIC_API_KEY — clé API Anthropic (console.anthropic.com)
+#   APP_TOKEN          — jeton partagé, le même que celui collé dans les
+#                         Paramètres de l'application Céréma sur chaque poste

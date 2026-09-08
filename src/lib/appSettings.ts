@@ -10,6 +10,16 @@ export interface AppSettings {
   hideBuiltInLibrary: boolean
   defaultFadeOutSeconds: number
   enablePreCeremonyChecklist: boolean
+  /**
+   * Adresse du service de génération de texte par IA (worker Cloudflare, voir
+   * worker/README.md). Vide = génération par IA désactivée, l'application reste
+   * 100% locale. Nécessite une connexion internet — indisponible par exemple lors
+   * d'une cérémonie en cimetière hors réseau ; le générateur de texte local (sans
+   * IA) reste toujours disponible en secours.
+   */
+  aiEndpointUrl: string
+  /** Jeton d'application partagé avec le service ci-dessus (voir worker/README.md). */
+  aiAppToken: string
 }
 
 export const defaultAppSettings: AppSettings = {
@@ -20,6 +30,8 @@ export const defaultAppSettings: AppSettings = {
   hideBuiltInLibrary: false,
   defaultFadeOutSeconds: 2,
   enablePreCeremonyChecklist: false,
+  aiEndpointUrl: '',
+  aiAppToken: '',
 }
 
 const STORAGE_KEY = 'cerema-app-settings-v1'

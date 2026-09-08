@@ -5,7 +5,8 @@ Application web (PC et tablette) pensée pour les maîtres de cérémonie du fun
 ## Fonctionnalités
 
 - **Cérémonies** : fiche défunt/famille, type de cérémonie, date/lieu, et un déroulé (timeline) découpé en étapes avec un texte à lire pour chacune.
-- **Biographie du défunt** : une page dédiée, pensée comme un guide d'entretien avec la famille, pour recueillir tout ce qui donne du relief à un éloge — état civil, scolarité, vie professionnelle et engagements, conjoint(e)/enfants/petits-enfants, mais aussi portrait et personnalité (traits de caractère, une phrase qu'il/elle répétait, un objet ou une odeur associée, ce dont il/elle était fier(ère), une valeur qui le/la guidait), anecdotes, et le regard croisé de ses proches (conjoint, enfants, amis, collègues). Un bouton assemble une première ébauche de texte à partir de ces informations, avec les bons accords grammaticaux et élisions selon le genre renseigné ; chaque phrase est choisie parmi plusieurs formulations pour varier le style et le vocabulaire — cliquer sur « régénérer » propose alors une autre tournure sans changer les informations saisies. Pas de génération par IA : un montage de phrases à relire et personnaliser, à copier ou insérer directement dans une étape du déroulé.
+- **Biographie du défunt** : une page dédiée, pensée comme un guide d'entretien avec la famille, pour recueillir tout ce qui donne du relief à un éloge — état civil, scolarité, vie professionnelle et engagements, conjoint(e)/enfants/petits-enfants, mais aussi portrait et personnalité (traits de caractère, une phrase qu'il/elle répétait, un objet ou une odeur associée, ce dont il/elle était fier(ère), une valeur qui le/la guidait), anecdotes, et le regard croisé de ses proches (conjoint, enfants, amis, collègues). Un bouton assemble une première ébauche de texte à partir de ces informations, avec les bons accords grammaticaux et élisions selon le genre renseigné ; chaque phrase est choisie parmi plusieurs formulations pour varier le style et le vocabulaire — cliquer sur « régénérer » propose alors une autre tournure sans changer les informations saisies. Ce générateur local fonctionne entièrement hors-ligne, y compris en cimetière sans réseau. Un second bouton, optionnel, permet de générer une ébauche par IA (voir « Génération de texte par IA » ci-dessous) pour un texte plus librement rédigé.
+- **Génération de texte par IA (optionnelle)** : en complément du générateur local, un bouton « 🤖 Générer avec l'IA » sur la page Biographie et sur chaque étape du déroulé envoie les informations saisies à un service en ligne pour produire un texte rédigé par IA. Nécessite une connexion internet et une configuration préalable (voir plus bas) ; en son absence ou hors-ligne, l'application le signale clairement et le générateur local reste disponible — jamais de blocage.
 - **Musiques et photos propres à chaque cérémonie** : les fichiers importés (MP3, WAV, M4A…, photos) sont directement gérés depuis l'éditeur de la cérémonie et n'appartiennent qu'à elle — une nouvelle cérémonie démarre toujours avec une photothèque et une liste de musiques vierges, sans jamais mélanger les souvenirs de deux familles différentes. Supprimer une cérémonie supprime aussi ses photos et musiques importées. Seule la bibliothèque libre de droit (20 compositions, page « Musique libre de droit ») reste commune à toutes les cérémonies.
 - **Découpe audio non destructive** : forme d'onde visuelle de chaque musique importée, avec des repères à glisser pour ne garder que le passage souhaité — utile pour retirer une introduction bruitée ou une fin inadaptée avant de jouer le morceau en cérémonie. Écoute de l'extrait sélectionné avant validation. Le fichier d'origine est toujours conservé : on peut rouvrir l'outil à tout moment pour récupérer un passage déjà retiré, affiner une coupe, ou tout annuler d'un clic (« Restaurer l'original »).
 - **Diaporama** : sélection des photos importées pour la cérémonie, avec une liste d'ordre dédiée (flèches monter/descendre, retrait) pour corriger une erreur de clic sans devoir tout resélectionner ; réglages de transition (fondu, dissolution, glissement, cut), durée par photo, effet Ken Burns, lecture en boucle, et une case « Ordre aléatoire » pour mélanger l'ordre de lecture quand la famille n'a pas de préférence.
@@ -16,11 +17,11 @@ Application web (PC et tablette) pensée pour les maîtres de cérémonie du fun
 - **Bibliothèque de citations** : sur le même principe, des citations de livres passés à la postérité sur le deuil et la mort (Sénèque, Bossuet, Montaigne, Marc Aurèle, Saint Augustin, Pascal), classées par situation et assorties d'une note d'usage, plus une liste indicative de lectures contemporaines de référence (Christophe Fauré, Marie de Hennezel, Simone de Beauvoir, C. S. Lewis, Kübler-Ross…) — celles-ci restant sous droits, seules leurs références sont données, pas de citation intégrale.
 - **Clavier & télécommande** : pilotage de la régie (étapes, musique, diaporama, écran noir) au clavier ou avec une télécommande de présentation Bluetooth/USB, avec réassignation libre des touches par utilisateur.
 - **Écran de projection** : une fenêtre séparée à envoyer sur un second écran/vidéoprojecteur, synchronisée en temps réel avec la régie via `BroadcastChannel`.
-- **Fonctionne hors-ligne** : toutes les données (cérémonies, musiques, photos) sont stockées localement dans le navigateur (IndexedDB) — aucune connexion internet requise le jour de la cérémonie.
+- **Fonctionne hors-ligne** : toutes les données (cérémonies, musiques, photos) sont stockées localement dans le navigateur (IndexedDB) — aucune connexion internet requise le jour de la cérémonie. Seule la génération de texte par IA (ci-dessus), optionnelle, nécessite d'être en ligne ; tout le reste, y compris son équivalent local, fonctionne sans réseau.
 - **Sauvegarde** : export/import d'une sauvegarde complète (ZIP) de toutes les cérémonies, musiques et photos, à conserver ailleurs que sur l'appareil.
 - **Application installable (PWA)** : à installer sur l'écran d'accueil d'une tablette ou d'un PC comme une vraie application, avec mise en cache de l'appli pour un chargement garanti même sans réseau.
 - **Accès protégé par licence** : l'application est verrouillée tant qu'une clé d'activation valide n'a pas été saisie ; chaque poste choisit ensuite son identifiant et son mot de passe (plusieurs identifiants possibles par licence, selon le nombre de postes vendus). Voir « Licences et activation » ci-dessous.
-- **Paramètres** : afficher/masquer le prompteur et le compteur d'avance/retard en régie, taille de texte et vitesse de défilement par défaut, masquer la bibliothèque libre de droit dans les sélecteurs de musique, durée du fondu de sortie, check-list technique avant le direct (désactivée par défaut, activable au besoin), informations de licence et changement de mot de passe.
+- **Paramètres** : afficher/masquer le prompteur et le compteur d'avance/retard en régie, taille de texte et vitesse de défilement par défaut, masquer la bibliothèque libre de droit dans les sélecteurs de musique, durée du fondu de sortie, check-list technique avant le direct (désactivée par défaut, activable au besoin), configuration de la génération de texte par IA (optionnelle, voir plus bas), informations de licence et changement de mot de passe.
 
 ## Démarrer en développement
 
@@ -75,6 +76,29 @@ de passe (stockés localement, mot de passe jamais en clair). Si la licence
 inclut plusieurs postes, chaque personne de l'agence peut créer son propre
 identifiant depuis l'écran de connexion, jusqu'à la limite achetée.
 
+## Génération de texte par IA (optionnelle)
+
+Céréma reste par défaut un logiciel 100% local et hors-ligne — l'IA n'est qu'une
+option, jamais un passage obligé. Pour l'activer :
+
+1. Déployez le service fourni dans le dossier [`worker/`](./worker) (un « worker »
+   Cloudflare qui appelle l'API Claude avec votre propre clé — voir
+   [`worker/README.md`](./worker/README.md) pour le guide de déploiement complet,
+   les coûts, et la protection contre les abus).
+2. Dans l'application, **Paramètres → Génération de texte par IA**, renseignez
+   l'adresse du service obtenue à l'étape précédente et le jeton d'application
+   choisi lors du déploiement, puis testez la connexion.
+
+Une fois configurée, un bouton « 🤖 Générer avec l'IA » apparaît à côté du
+générateur local sur la page Biographie et sur chaque étape du déroulé. Cette
+option nécessite une connexion internet ; sans elle (par exemple en cimetière
+hors réseau), l'application l'indique clairement et le générateur local sans IA
+reste toujours utilisable en secours.
+
+**Confidentialité** : seules les informations que vous saisissez sont envoyées
+au service, uniquement au moment de cliquer sur « Générer » — rien n'est envoyé
+automatiquement ni en arrière-plan.
+
 ## Stack technique
 
 - React + TypeScript + Vite
@@ -83,6 +107,7 @@ identifiant depuis l'écran de connexion, jusqu'à la limite achetée.
 - React Router pour la navigation
 - `BroadcastChannel` pour synchroniser la régie et l'écran de projection
 - `vite-plugin-pwa` (Workbox) pour le manifeste et le service worker
+- Worker Cloudflare + API Claude (Anthropic) pour la génération de texte par IA, optionnelle (dossier `worker/`)
 
 ## Pistes d'évolution
 

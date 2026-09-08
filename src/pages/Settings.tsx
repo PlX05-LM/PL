@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { changePassword, getLicense, listAccounts, loadSession } from '../lib/licensing/store'
 import type { AccountRecord, LicenseRecord } from '../lib/licensing/types'
 import { loadAppSettings, saveAppSettings, type AppSettings } from '../lib/appSettings'
+import { generateSegmentTextAI } from '../lib/aiGeneration'
 
 const inputClass =
   'w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-sm text-fg outline-none focus:border-gold-dim'
@@ -21,6 +22,30 @@ export default function Settings() {
     const next = { ...settings, [key]: value }
     setSettings(next)
     saveAppSettings(next)
+  }
+
+  const [testingAi, setTestingAi] = useState(false)
+  const [aiTestResult, setAiTestResult] = useState<'ok' | 'error' | null>(null)
+  const [aiTestMessage, setAiTestMessage] = useState<string | null>(null)
+
+  async function handleTestAi() {
+    setTestingAi(true)
+    setAiTestResult(null)
+    setAiTestMessage(null)
+    try {
+      await generateSegmentTextAI({
+        ceremonyType: 'autre',
+        segmentTitle: 'Test de connexion',
+        instructions:
+          "Ceci est un test de connexion depuis les Paramètres de l'application. Réponds simplement par une phrase confirmant que la connexion fonctionne.",
+      })
+      setAiTestResult('ok')
+    } catch (err) {
+      setAiTestResult('error')
+      setAiTestMessage(err instanceof Error ? err.message : 'Erreur inconnue.')
+    } finally {
+      setTestingAi(false)
+    }
   }
 
   const [oldPassword, setOldPassword] = useState('')
@@ -162,6 +187,52 @@ export default function Settings() {
           de la régie pour repasser en revue les points techniques usuels (sortie audio, musiques,
           diaporama, projection…) avant de démarrer.
         </p>
+      </section>
+
+      <section className="mb-6 rounded-lg border border-line bg-panel p-5">
+        <h3 className="mb-3 font-display text-lg text-fg">Génération de texte par IA</h3>
+        <p className="mb-4 text-xs text-muted">
+          Optionnelle et désactivée par défaut : l'application reste 100% locale sans cette
+          configuration. Une fois activée, elle vient s'ajouter au générateur local (sans IA,
+          toujours disponible) pour l'ébauche biographique et les étapes du déroulé. Nécessite une
+          connexion internet — indisponible par exemple lors d'une cérémonie en cimetière hors
+          réseau ; l'application détecte automatiquement l'absence de réseau et propose alors le
+          générateur local. Un service à héberger vous-même : voir{' '}
+          <code className="text-fg">worker/README.md</code> dans le dépôt du projet pour le mettre
+          en place.
+        </p>
+        <label className="mb-3 block text-xs text-muted">
+          Adresse du service (URL du worker)
+          <input
+            value={settings.aiEndpointUrl}
+            onChange={(e) => update('aiEndpointUrl', e.target.value)}
+            placeholder="https://cerema-ai-proxy.votre-compte.workers.dev"
+            className={`mt-1 ${inputClass}`}
+          />
+        </label>
+        <label className="mb-3 block text-xs text-muted">
+          Jeton d'application
+          <input
+            type="password"
+            value={settings.aiAppToken}
+            onChange={(e) => update('aiAppToken', e.target.value)}
+            placeholder="le même jeton que celui défini côté service"
+            className={`mt-1 ${inputClass}`}
+          />
+        </label>
+        <button
+          onClick={handleTestAi}
+          disabled={testingAi || !settings.aiEndpointUrl.trim() || !settings.aiAppToken.trim()}
+          className="rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold disabled:opacity-40"
+        >
+          {testingAi ? 'Test en cours…' : 'Tester la connexion'}
+        </button>
+        {aiTestResult === 'ok' && (
+          <p className="mt-2 text-xs text-gold">✓ Connexion au service IA réussie.</p>
+        )}
+        {aiTestResult === 'error' && (
+          <p className="mt-2 text-xs text-danger">✕ {aiTestMessage}</p>
+        )}
       </section>
 
       <section className="rounded-lg border border-line bg-panel p-5">

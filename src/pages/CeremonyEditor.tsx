@@ -11,6 +11,7 @@ import TextLibraryModal from '../components/TextLibraryModal'
 import PoemLibraryModal from '../components/PoemLibraryModal'
 import CitationLibraryModal from '../components/CitationLibraryModal'
 import AudioTrimModal from '../components/AudioTrimModal'
+import AIGenerateModal from '../components/AIGenerateModal'
 import type {
   Ceremony,
   CeremonySegment,
@@ -150,6 +151,7 @@ export default function CeremonyEditor() {
   const [textLibraryForSegment, setTextLibraryForSegment] = useState<string | null>(null)
   const [poemLibraryForSegment, setPoemLibraryForSegment] = useState<string | null>(null)
   const [citationLibraryForSegment, setCitationLibraryForSegment] = useState<string | null>(null)
+  const [aiGenerateForSegment, setAiGenerateForSegment] = useState<string | null>(null)
 
   function insertText(segId: string, text: string) {
     if (!draft) return
@@ -160,6 +162,7 @@ export default function CeremonyEditor() {
     setTextLibraryForSegment(null)
     setPoemLibraryForSegment(null)
     setCitationLibraryForSegment(null)
+    setAiGenerateForSegment(null)
   }
 
   function togglePhoto(photoId: string) {
@@ -590,6 +593,13 @@ export default function CeremonyEditor() {
                       >
                         💬 Citation
                       </button>
+                      <button
+                        onClick={() => setAiGenerateForSegment(seg.id)}
+                        title="Générer le texte de cette étape par IA (nécessite une connexion internet)"
+                        className="whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+                      >
+                        🤖 IA
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -862,6 +872,16 @@ export default function CeremonyEditor() {
         <CitationLibraryModal
           onInsert={(text) => insertText(citationLibraryForSegment, text)}
           onClose={() => setCitationLibraryForSegment(null)}
+        />
+      )}
+
+      {aiGenerateForSegment && (
+        <AIGenerateModal
+          ceremonyType={draft.ceremonyType}
+          deceasedName={draft.deceasedName}
+          segmentTitle={draft.segments.find((s) => s.id === aiGenerateForSegment)?.title ?? 'Étape'}
+          onInsert={(text) => insertText(aiGenerateForSegment, text)}
+          onClose={() => setAiGenerateForSegment(null)}
         />
       )}
 
