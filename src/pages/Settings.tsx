@@ -3,6 +3,7 @@ import { changePassword, getLicense, listAccounts, loadSession } from '../lib/li
 import type { AccountRecord, LicenseRecord } from '../lib/licensing/types'
 import { loadAppSettings, saveAppSettings, type AppSettings } from '../lib/appSettings'
 import { generateSegmentTextAI } from '../lib/aiGeneration'
+import Icon from '../components/Icon'
 
 const inputClass =
   'w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-sm text-fg outline-none focus:border-gold-dim'
@@ -183,7 +184,7 @@ export default function Settings() {
           />
         </label>
         <p className="text-xs text-muted">
-          Désactivée par défaut. Une fois activée, un bouton « ✅ Check-list » apparaît dans l'en-tête
+          Désactivée par défaut. Une fois activée, un bouton « Check-list » apparaît dans l'en-tête
           de la régie pour repasser en revue les points techniques usuels (sortie audio, musiques,
           diaporama, projection…) avant de démarrer.
         </p>
@@ -246,8 +247,9 @@ export default function Settings() {
         {accounts.length > 0 && (
           <ul className="mb-4 space-y-1 text-sm text-muted">
             {accounts.map((a) => (
-              <li key={a.id}>
-                👤 {a.username} {session?.accountId === a.id && <span className="text-gold">(vous)</span>}
+              <li key={a.id} className="flex items-center gap-1.5">
+                <Icon name="user" className="h-3.5 w-3.5 shrink-0" />
+                {a.username} {session?.accountId === a.id && <span className="text-gold">(vous)</span>}
               </li>
             ))}
           </ul>

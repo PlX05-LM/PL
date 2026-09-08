@@ -5,6 +5,7 @@ import { formatDuration } from '../lib/audioDuration'
 import { isBuiltInTrackId } from '../lib/appSettings'
 import type { BuiltInLibraryProgress } from '../lib/royaltyFreeMusic'
 import AudioTrimModal from '../components/AudioTrimModal'
+import Icon from '../components/Icon'
 import type { Track } from '../types'
 
 export default function MusicLibrary() {
@@ -90,7 +91,7 @@ export default function MusicLibrary() {
               {builtInProgress
                 ? `Génération… ${builtInProgress.index}/${builtInProgress.total}`
                 : hasBuiltInLibrary
-                  ? '🔄 Régénérer les sonorités'
+                  ? 'Régénérer les sonorités'
                   : '+ Ajouter les 20 musiques'}
             </button>
             {hasBuiltInLibrary && !builtInProgress && (
@@ -135,9 +136,10 @@ export default function MusicLibrary() {
                   setTrimmingTrack(t)
                 }}
                 title="Analyser la forme d'onde et couper les passages indésirables (intro bruitée, etc.)"
-                className="text-xs text-muted hover:text-fg"
+                className="flex items-center gap-1 text-xs text-muted hover:text-fg"
               >
-                ✂️ Couper
+                <Icon name="scissors" className="h-3 w-3" />
+                Couper
               </button>
             </li>
           ))}

@@ -7,6 +7,7 @@ import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { composeBiographyDraft, hasAnyBiographyContent } from '../lib/biographyComposer'
 import { AiGenerationError, generateBiographyDraftAI, isAiConfigured } from '../lib/aiGeneration'
 import { createEmptyBiography, type Biography, type BiographyChild } from '../types'
+import Icon from '../components/Icon'
 
 const inputClass =
   'w-full rounded-md border border-line bg-panel-2 px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-gold-dim focus:outline-none'
@@ -476,15 +477,16 @@ export default function Biography() {
           <button
             onClick={handleGenerate}
             disabled={!canGenerate}
-            className="rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink hover:bg-gold-dim disabled:opacity-50"
+            className="flex items-center gap-2 rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink hover:bg-gold-dim disabled:opacity-50"
             title={canGenerate ? undefined : 'Renseignez au moins une information ci-dessus.'}
           >
-            ✨ Générer / régénérer (local, hors-ligne)
+            <Icon name="sparkle" className="h-4 w-4" />
+            Générer / régénérer (local, hors-ligne)
           </button>
           <button
             onClick={handleGenerateAI}
             disabled={!canGenerate || generatingAi}
-            className="rounded-md border border-gold-dim px-4 py-2 text-sm font-medium text-gold hover:bg-panel-2 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-md border border-gold-dim px-4 py-2 text-sm font-medium text-gold hover:bg-panel-2 disabled:opacity-50"
             title={
               !canGenerate
                 ? 'Renseignez au moins une information ci-dessus.'
@@ -493,7 +495,14 @@ export default function Biography() {
                   : undefined
             }
           >
-            {generatingAi ? 'Génération…' : '🤖 Générer avec l\'IA (en ligne)'}
+            {generatingAi ? (
+              'Génération…'
+            ) : (
+              <>
+                <Icon name="sparkle" className="h-4 w-4" />
+                Générer avec l'IA (en ligne)
+              </>
+            )}
           </button>
         </div>
         <p className="mb-3 text-xs text-muted">
@@ -519,9 +528,16 @@ export default function Biography() {
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 onClick={handleCopy}
-                className="rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-fg"
+                className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-fg"
               >
-                {copied ? '✓ Copié' : '📋 Copier le texte'}
+                {copied ? (
+                  '✓ Copié'
+                ) : (
+                  <>
+                    <Icon name="copy" className="h-3.5 w-3.5" />
+                    Copier le texte
+                  </>
+                )}
               </button>
               {ceremony.segments.length > 0 && (
                 <>

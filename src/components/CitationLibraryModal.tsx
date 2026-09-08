@@ -51,7 +51,7 @@ export default function CitationLibraryModal({ onInsert, onClose }: Props) {
               showReadingList ? 'bg-gold text-ink' : 'text-muted hover:bg-panel hover:text-fg'
             }`}
           >
-            📚 Lectures conseillées (sous droits)
+            Lectures conseillées (sous droits)
           </button>
         </aside>
 
@@ -121,8 +121,8 @@ export default function CitationLibraryModal({ onInsert, onClose }: Props) {
                         {selected.author} ({selected.authorDates})
                       </p>
                     </div>
-                    <p className="mb-3 rounded-md border border-gold-dim/40 bg-panel-2 px-3 py-2 text-xs text-gold">
-                      💡 {selected.note}
+                    <p className="mb-3 rounded-md border-l-2 border-gold-dim bg-panel-2 px-3 py-2 text-xs italic text-gold">
+                      {selected.note}
                     </p>
                     <div className="flex-1 overflow-y-auto whitespace-pre-wrap rounded-md border border-line bg-panel-2 p-4 font-display text-sm text-fg">
                       « {selected.quote} »

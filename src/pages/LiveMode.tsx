@@ -21,6 +21,7 @@ import {
   unlockDeviceLabels,
 } from '../lib/audioOutput'
 import { isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
+import Icon from '../components/Icon'
 
 /** Mélange déterministe (même graine → même ordre) : stable pour une cérémonie donnée. */
 function seededShuffle<T>(items: T[], seed: string): T[] {
@@ -535,24 +536,26 @@ export default function LiveMode() {
           <button
             onClick={openProjector}
             title="Ouvre une fenêtre à faire glisser sur l'écran externe (TV/vidéoprojecteur branché en HDMI, ou via un cast Chromecast/AirPlay), puis à passer en plein écran depuis cette fenêtre."
-            className="rounded-md border border-gold-dim px-3 py-1.5 text-sm text-gold hover:bg-panel-2"
+            className="flex items-center gap-1.5 rounded-md border border-gold-dim px-3 py-1.5 text-sm text-gold hover:bg-panel-2"
           >
-            🖥 Ouvrir la projection
+            <Icon name="monitor" className="h-4 w-4" />
+            Ouvrir la projection
           </button>
           <button
             onClick={() => setShowRemoteSettings(true)}
             title="Configurer le clavier ou une télécommande de présentation pour piloter la régie sans toucher l'écran"
-            className="rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:border-gold-dim hover:text-fg"
+            className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:border-gold-dim hover:text-fg"
           >
-            ⌨️ Télécommande
+            <Icon name="keyboard" className="h-4 w-4" />
+            Télécommande
           </button>
           {appSettings.enablePreCeremonyChecklist && (
             <button
               onClick={() => setShowChecklist(true)}
               title="Repasser en revue les points techniques usuels avant de démarrer"
-              className="rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:border-gold-dim hover:text-fg"
+              className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:border-gold-dim hover:text-fg"
             >
-              ✅ Check-list
+              Check-list
             </button>
           )}
         </div>
@@ -575,7 +578,12 @@ export default function LiveMode() {
                     <span>{seg.title}</span>
                     <span className="text-xs">{seg.estimatedDuration}m</span>
                   </div>
-                  {seg.trackId && <div className="mt-0.5 text-xs text-muted">🎵 assignée</div>}
+                  {seg.trackId && (
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+                      <Icon name="music" className="h-3 w-3" />
+                      Musique assignée
+                    </div>
+                  )}
                 </button>
               </li>
             ))}
@@ -767,9 +775,16 @@ export default function LiveMode() {
                   <button
                     onClick={detectAudioDevices}
                     disabled={detectingDevices}
-                    className="rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-fg disabled:opacity-50"
+                    className="flex items-center gap-1 rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-fg disabled:opacity-50"
                   >
-                    {detectingDevices ? '…' : '🔄 Détecter'}
+                    {detectingDevices ? (
+                      '…'
+                    ) : (
+                      <>
+                        <Icon name="refresh" className="h-3 w-3" />
+                        Détecter
+                      </>
+                    )}
                   </button>
                 </div>
                 <select
@@ -798,9 +813,10 @@ export default function LiveMode() {
                 </div>
                 <button
                   onClick={openAirPlayPicker}
-                  className="w-full rounded-md border border-gold-dim px-2 py-1.5 text-xs text-gold hover:bg-panel"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gold-dim px-2 py-1.5 text-xs text-gold hover:bg-panel"
                 >
-                  📡 AirPlay / Bluetooth…
+                  <Icon name="wireless" className="h-3.5 w-3.5" />
+                  AirPlay / Bluetooth…
                 </button>
                 <p className="mt-1 text-[10px] text-muted">
                   {isApplePlatform()
@@ -829,13 +845,23 @@ export default function LiveMode() {
                   ? "Aucune photo fixe définie pour cette cérémonie (à marquer dans l'éditeur de cérémonie)"
                   : undefined
               }
-              className={`mb-2 w-full rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
+              className={`mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
                 photoMode === 'fixe'
                   ? 'border-sky-400 text-sky-400 hover:bg-panel-2'
                   : 'border-line text-muted hover:text-fg'
               }`}
             >
-              {photoMode === 'fixe' ? '🎞️ Rebasculer sur le diaporama' : '📌 Afficher la photo fixe'}
+              {photoMode === 'fixe' ? (
+                <>
+                  <Icon name="film" className="h-3.5 w-3.5" />
+                  Rebasculer sur le diaporama
+                </>
+              ) : (
+                <>
+                  <Icon name="pin" className="h-3.5 w-3.5" />
+                  Afficher la photo fixe
+                </>
+              )}
             </button>
 
             {photoMode === 'fixe' ? (

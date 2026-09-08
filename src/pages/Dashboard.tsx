@@ -4,6 +4,7 @@ import { db } from '../db'
 import { createEmptyCeremony, type Ceremony } from '../types'
 import { newId } from '../lib/ids'
 import { useNavigate } from 'react-router-dom'
+import Icon from '../components/Icon'
 
 const typeLabels: Record<Ceremony['ceremonyType'], string> = {
   obseques: 'Obsèques',
@@ -85,8 +86,8 @@ export default function Dashboard() {
 
       {ceremonies.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line p-12 text-center">
-          <div className="animate-soft-float mb-4 text-5xl" aria-hidden>
-            🕊️
+          <div className="animate-soft-float mb-4 flex justify-center text-gold-dim" aria-hidden>
+            <Icon name="flame" className="h-12 w-12" />
           </div>
           <p className="text-muted">
             Aucune cérémonie pour le moment. Créez-en une pour commencer à
@@ -131,7 +132,7 @@ export default function Dashboard() {
                   className="rounded-md border border-line px-3 py-1.5 text-xs text-muted transition-colors hover:border-gold-dim hover:text-fg"
                   title="Exporter le déroulé en PDF"
                 >
-                  📄 PDF
+                  PDF
                 </button>
                 <button
                   onClick={() => navigate(`/ceremonies/${c.id}/live`)}

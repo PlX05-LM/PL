@@ -12,6 +12,7 @@ import PoemLibraryModal from '../components/PoemLibraryModal'
 import CitationLibraryModal from '../components/CitationLibraryModal'
 import AudioTrimModal from '../components/AudioTrimModal'
 import AIGenerateModal from '../components/AIGenerateModal'
+import Icon from '../components/Icon'
 import type {
   Ceremony,
   CeremonySegment,
@@ -335,26 +336,41 @@ export default function CeremonyEditor() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate(`/ceremonies/${draft.id}/biographie`)}
-            className="rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg"
+            className="flex items-center gap-1.5 rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg"
             title="Recueillir les informations biographiques et préparer l'éloge"
           >
-            📝 Biographie
+            <Icon name="edit" className="h-3.5 w-3.5" />
+            Biographie
           </button>
           <button
             onClick={handleExportPdf}
             disabled={exportingPdf}
-            className="rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg disabled:opacity-40"
             title="Exporter le déroulé complet en PDF (à imprimer ou partager)"
           >
-            {exportingPdf ? 'Génération…' : '📄 Exporter en PDF'}
+            {exportingPdf ? (
+              'Génération…'
+            ) : (
+              <>
+                <Icon name="document" className="h-3.5 w-3.5" />
+                Exporter en PDF
+              </>
+            )}
           </button>
           <button
             onClick={handleExportMusic}
             disabled={exportingMusic || usedTracks.length === 0}
-            className="rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-md border border-line px-3 py-2 text-sm text-muted hover:border-gold-dim hover:text-fg disabled:opacity-40"
             title="Exporter les musiques de la cérémonie dans un fichier ZIP (pour la sono du lieu)"
           >
-            {exportingMusic ? 'Préparation du ZIP…' : `🎵 Exporter la musique (${usedTracks.length})`}
+            {exportingMusic ? (
+              'Préparation du ZIP…'
+            ) : (
+              <>
+                <Icon name="music" className="h-3.5 w-3.5" />
+                Exporter la musique ({usedTracks.length})
+              </>
+            )}
           </button>
           <button
             onClick={() => navigate(`/ceremonies/${draft.id}/live`)}
@@ -481,9 +497,10 @@ export default function CeremonyEditor() {
                     setTrimmingTrack(t)
                   }}
                   title="Couper les passages indésirables"
-                  className="text-xs text-muted hover:text-fg"
+                  className="flex items-center gap-1 text-xs text-muted hover:text-fg"
                 >
-                  ✂️ Couper
+                  <Icon name="scissors" className="h-3 w-3" />
+                  Couper
                 </button>
                 <button
                   onClick={() => removeTrack(t)}
@@ -549,10 +566,10 @@ export default function CeremonyEditor() {
                       }
                       className="rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
                     >
-                      <option value="">🎵 Aucune musique</option>
+                      <option value="">Aucune musique</option>
                       {selectableTracks.map((t) => (
                         <option key={t.id} value={t.id}>
-                          🎵 {t.name}
+                          {t.name}
                         </option>
                       ))}
                     </select>
@@ -575,30 +592,34 @@ export default function CeremonyEditor() {
                       <button
                         onClick={() => setTextLibraryForSegment(seg.id)}
                         title="Insérer un texte-type (ouverture, transition, hommage, clôture, pensées, repères religieux)"
-                        className="whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+                        className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
                       >
-                        📖 Texte-type
+                        <Icon name="book" className="h-3.5 w-3.5" />
+                        Texte-type
                       </button>
                       <button
                         onClick={() => setPoemLibraryForSegment(seg.id)}
                         title="Insérer un poème (classés par situation de deuil)"
-                        className="whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+                        className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
                       >
-                        📜 Poème
+                        <Icon name="feather" className="h-3.5 w-3.5" />
+                        Poème
                       </button>
                       <button
                         onClick={() => setCitationLibraryForSegment(seg.id)}
                         title="Insérer une citation de livre (classées par situation de deuil)"
-                        className="whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+                        className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
                       >
-                        💬 Citation
+                        <Icon name="quote" className="h-3.5 w-3.5" />
+                        Citation
                       </button>
                       <button
                         onClick={() => setAiGenerateForSegment(seg.id)}
                         title="Générer le texte de cette étape par IA (nécessite une connexion internet)"
-                        className="whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+                        className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
                       >
-                        🤖 IA
+                        <Icon name="sparkle" className="h-3.5 w-3.5" />
+                        IA
                       </button>
                     </div>
                   </div>
@@ -727,7 +748,7 @@ export default function CeremonyEditor() {
                   {draft.title || 'cette cérémonie'}
                 </p>
                 <p className="mt-1 text-xs text-muted">
-                  📌 Marquez une photo comme « photo fixe » pour l'afficher seule, sans
+                  Marquez une photo comme « photo fixe » pour l'afficher seule, sans
                   diaporama — utile en introduction ou si la famille demande d'y revenir en
                   cours de cérémonie. Bascule disponible dans le panneau Diaporama de la régie
                   live.
@@ -820,10 +841,10 @@ export default function CeremonyEditor() {
                         )}
                         {isFixed && (
                           <span
-                            className="absolute bottom-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-sky-400 text-[10px]"
+                            className="absolute bottom-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-sky-400 text-ink"
                             title="Photo fixe de cette cérémonie"
                           >
-                            📌
+                            <Icon name="pin" className="h-3 w-3" />
                           </span>
                         )}
                       </button>
@@ -836,12 +857,12 @@ export default function CeremonyEditor() {
                       </button>
                       <button
                         onClick={() => toggleFixedPhoto(p.id)}
-                        className={`absolute bottom-1 right-1 hidden rounded-full bg-ink/80 px-1.5 py-0.5 text-xs group-hover:block ${
+                        className={`absolute bottom-1 right-1 hidden rounded-full bg-ink/80 p-1 group-hover:block ${
                           isFixed ? 'text-sky-400' : 'text-muted hover:text-fg'
                         }`}
                         title={isFixed ? 'Retirer comme photo fixe' : 'Définir comme photo fixe'}
                       >
-                        📌
+                        <Icon name="pin" className="h-3 w-3" />
                       </button>
                     </div>
                   )

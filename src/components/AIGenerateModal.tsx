@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AiGenerationError, generateSegmentTextAI, isAiConfigured } from '../lib/aiGeneration'
+import Icon from './Icon'
 import type { CeremonyType } from '../types'
 
 interface Props {
@@ -35,7 +36,10 @@ export default function AIGenerateModal({ ceremonyType, deceasedName, segmentTit
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
       <div className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-line bg-panel">
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h3 className="font-display text-lg text-fg">🤖 Générer avec l'IA — {segmentTitle}</h3>
+          <h3 className="flex items-center gap-2 font-display text-lg text-fg">
+            <Icon name="sparkle" className="h-4 w-4 text-gold" />
+            Générer avec l'IA — {segmentTitle}
+          </h3>
           <button onClick={onClose} className="text-muted hover:text-fg">
             ✕
           </button>

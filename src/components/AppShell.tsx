@@ -1,12 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useInstallPrompt } from '../lib/useInstallPrompt'
 import { clearSession, loadSession } from '../lib/licensing/store'
+import Icon, { type IconName } from './Icon'
 
-const navItems = [
-  { to: '/', label: 'Cérémonies', icon: '🕊️', end: true },
-  { to: '/musique', label: 'Musique libre de droit', icon: '🎵' },
-  { to: '/sauvegarde', label: 'Sauvegarde', icon: '💾' },
-  { to: '/parametres', label: 'Paramètres', icon: '⚙️' },
+const navItems: { to: string; label: string; icon: IconName; end?: boolean }[] = [
+  { to: '/', label: 'Cérémonies', icon: 'flame', end: true },
+  { to: '/musique', label: 'Musique libre de droit', icon: 'music' },
+  { to: '/sauvegarde', label: 'Sauvegarde', icon: 'archive' },
+  { to: '/parametres', label: 'Paramètres', icon: 'settings' },
 ]
 
 function handleLogout() {
@@ -23,10 +24,8 @@ export default function AppShell() {
       <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-panel">
         <div className="relative border-b border-line px-5 py-6">
           <div className="pointer-events-none absolute -left-4 -top-4 h-16 w-16 rounded-full bg-gold/20 blur-2xl animate-glow-pulse" />
-          <h1 className="relative font-display text-xl tracking-wide text-gold">
-            <span aria-hidden className="mr-1.5">
-              🕊️
-            </span>
+          <h1 className="relative flex items-center gap-2 font-display text-xl tracking-wide text-gold">
+            <Icon name="flame" className="h-5 w-5 shrink-0" />
             Céréo
           </h1>
           <p className="relative mt-1 text-xs text-muted">Régie de cérémonies</p>
@@ -45,12 +44,10 @@ export default function AppShell() {
                 }`
               }
             >
-              <span
-                aria-hidden
-                className="inline-block transition-transform duration-200 group-hover:scale-125"
-              >
-                {item.icon}
-              </span>
+              <Icon
+                name={item.icon}
+                className="h-4 w-4 shrink-0 transition-transform duration-200 group-hover:scale-110"
+              />
               {item.label}
             </NavLink>
           ))}
