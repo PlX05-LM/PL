@@ -1,4 +1,4 @@
-// Clé publique de vérification des licences Céréma.
+// Clé publique de vérification des licences Céréo.
 // Générée par `node scripts/generate-license-key.mjs` — sûre à publier :
 // elle ne permet que de VÉRIFIER une clé d'activation, jamais d'en fabriquer
 // une nouvelle (seule la clé privée, gardée hors du dépôt, le permet).

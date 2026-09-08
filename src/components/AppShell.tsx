@@ -27,7 +27,7 @@ export default function AppShell() {
             <span aria-hidden className="mr-1.5">
               🕊️
             </span>
-            Céréma
+            Céréo
           </h1>
           <p className="relative mt-1 text-xs text-muted">Régie de cérémonies</p>
         </div>

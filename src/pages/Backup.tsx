@@ -110,7 +110,7 @@ export default function Backup() {
       <div className="mt-6 rounded-lg border border-line bg-panel p-5">
         <h3 className="font-display text-lg text-fg">Restaurer depuis une sauvegarde</h3>
         <p className="mt-1 text-sm text-muted">
-          Sélectionnez un fichier de sauvegarde Céréma (.zip). Son contenu sera ajouté à votre
+          Sélectionnez un fichier de sauvegarde Céréo (.zip). Son contenu sera ajouté à votre
           bibliothèque actuelle, sans rien supprimer.
         </p>
         <label className="mt-3 inline-block cursor-pointer rounded-md border border-gold-dim px-4 py-2 text-sm font-medium text-gold hover:bg-panel-2">

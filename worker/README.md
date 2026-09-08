@@ -1,6 +1,6 @@
-# Céréma — service IA (proxy Cloudflare Worker)
+# Céréo — service IA (proxy Cloudflare Worker)
 
-Ce dossier contient le petit service qui permet à Céréma de générer des textes
+Ce dossier contient le petit service qui permet à Céréo de générer des textes
 par IA (ébauche biographique, texte d'une étape de cérémonie) : un « worker »
 Cloudflare qui reçoit les requêtes de l'application, appelle l'API Claude
 (Anthropic) avec une clé API gardée secrète côté serveur, et renvoie le texte
@@ -46,7 +46,7 @@ npx wrangler secret put ANTHROPIC_API_KEY
 
 # Jeton d'application : une chaîne que VOUS choisissez, longue et aléatoire
 # (ex. générée avec `openssl rand -hex 32`). Le même jeton doit être collé
-# dans les Paramètres de l'application Céréma sur chaque poste — c'est ce
+# dans les Paramètres de l'application Céréo sur chaque poste — c'est ce
 # qui empêche n'importe qui de découvrir l'URL du service et de l'utiliser
 # à vos frais.
 npx wrangler secret put APP_TOKEN
@@ -55,7 +55,7 @@ npx wrangler secret put APP_TOKEN
 npm run deploy
 ```
 
-La commande affiche une URL du type `https://cerema-ai-proxy.<votre-compte>.workers.dev`
+La commande affiche une URL du type `https://cereo-ai-proxy.<votre-compte>.workers.dev`
 — c'est l'« adresse du service IA » à coller dans les Paramètres de
 l'application, avec le jeton choisi ci-dessus.
 

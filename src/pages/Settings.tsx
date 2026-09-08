@@ -206,7 +206,7 @@ export default function Settings() {
           <input
             value={settings.aiEndpointUrl}
             onChange={(e) => update('aiEndpointUrl', e.target.value)}
-            placeholder="https://cerema-ai-proxy.votre-compte.workers.dev"
+            placeholder="https://cereo-ai-proxy.votre-compte.workers.dev"
             className={`mt-1 ${inputClass}`}
           />
         </label>

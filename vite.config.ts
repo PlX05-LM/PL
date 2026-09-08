@@ -16,8 +16,8 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: false,
       manifest: {
-        name: 'Céréma — Régie de cérémonies',
-        short_name: 'Céréma',
+        name: 'Céréo — Régie de cérémonies',
+        short_name: 'Céréo',
         description:
           'Préparez et pilotez vos cérémonies funéraires : déroulé, musiques, diaporama et régie live.',
         lang: 'fr',

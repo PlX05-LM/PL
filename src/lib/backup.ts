@@ -72,7 +72,7 @@ export async function exportFullBackup(): Promise<BackupStats> {
   const a = document.createElement('a')
   a.href = url
   const dateStr = new Date().toISOString().slice(0, 10)
-  a.download = `${toSafeFilename('Cerema-sauvegarde')}-${dateStr}.zip`
+  a.download = `${toSafeFilename('Cereo-sauvegarde')}-${dateStr}.zip`
   document.body.appendChild(a)
   a.click()
   a.remove()
@@ -86,12 +86,12 @@ export async function importFullBackup(file: File): Promise<BackupStats> {
   try {
     zip = await JSZip.loadAsync(file)
   } catch {
-    throw new Error("Ce fichier n'est pas une sauvegarde Céréma valide (ZIP illisible).")
+    throw new Error("Ce fichier n'est pas une sauvegarde Céréo valide (ZIP illisible).")
   }
 
   const manifestEntry = zip.file('backup.json')
   if (!manifestEntry) {
-    throw new Error("Ce fichier n'est pas une sauvegarde Céréma valide (backup.json introuvable).")
+    throw new Error("Ce fichier n'est pas une sauvegarde Céréo valide (backup.json introuvable).")
   }
 
   let manifest: BackupManifest

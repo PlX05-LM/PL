@@ -164,7 +164,7 @@ export function exportCeremonyPdf(ceremony: Ceremony, tracks: Track[]) {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(150, 150, 150)
-    doc.text(`Céréma · ${ceremony.title}`, marginX, pageHeight - 10)
+    doc.text(`Céréo · ${ceremony.title}`, marginX, pageHeight - 10)
     doc.text(`Page ${i}/${pageCount}`, pageWidth - marginX, pageHeight - 10, { align: 'right' })
   }
 

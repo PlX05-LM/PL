@@ -51,7 +51,7 @@ async function ensureKeyPair() {
   writeFileSync(PRIVATE_KEY_FILE, JSON.stringify(privateJwk, null, 2))
   writeFileSync(
     PUBLIC_KEY_FILE,
-    `// Clé publique de vérification des licences Céréma.
+    `// Clé publique de vérification des licences Céréo.
 // Générée par \`node scripts/generate-license-key.mjs\` — sûre à publier :
 // elle ne permet que de VÉRIFIER une clé d'activation, jamais d'en fabriquer
 // une nouvelle (seule la clé privée, gardée hors du dépôt, le permet).
@@ -89,7 +89,7 @@ async function main() {
   const payload = { customer, seats, issuedAt: Date.now(), id: randomUUID() }
   const payloadBytes = new TextEncoder().encode(JSON.stringify(payload))
   const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privateKey, payloadBytes)
-  const token = `CEREMA-${bytesToBase64Url(payloadBytes)}.${bytesToBase64Url(new Uint8Array(signature))}`
+  const token = `CEREO-${bytesToBase64Url(payloadBytes)}.${bytesToBase64Url(new Uint8Array(signature))}`
 
   console.log('Client :', customer)
   console.log('Postes (identifiants possibles sous cette licence) :', seats)

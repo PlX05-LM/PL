@@ -23,7 +23,7 @@ export default function PwaUpdatePrompt() {
   return (
     <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-gold-dim bg-panel px-4 py-3 shadow-lg">
       <span className="text-sm text-fg">
-        Une mise à jour de Céréma est disponible.
+        Une mise à jour de Céréo est disponible.
       </span>
       <button
         onClick={() => updateApp?.(true)}

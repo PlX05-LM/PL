@@ -122,7 +122,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-ink p-6">
       <div className="w-full max-w-sm rounded-lg border border-line bg-panel p-6">
-        <h1 className="mb-1 font-display text-xl tracking-wide text-gold">Céréma</h1>
+        <h1 className="mb-1 font-display text-xl tracking-wide text-gold">Céréo</h1>
 
         {stage === 'activation' && (
           <>
@@ -133,7 +133,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
               rows={3}
-              placeholder="CEREMA-…"
+              placeholder="CEREO-…"
               className="w-full resize-none rounded-md border border-line bg-panel-2 px-2 py-1.5 font-mono text-xs text-fg outline-none focus:border-gold-dim"
             />
             {activationError && <p className="mt-2 text-xs text-danger">{activationError}</p>}
@@ -188,7 +188,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
 
         {stage === 'login' && (
           <>
-            <p className="mb-4 text-sm text-muted">Connectez-vous pour accéder à Céréma.</p>
+            <p className="mb-4 text-sm text-muted">Connectez-vous pour accéder à Céréo.</p>
             <div className="space-y-2">
               <input
                 value={loginUsername}

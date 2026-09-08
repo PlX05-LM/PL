@@ -1,4 +1,4 @@
-name = "cerema-ai-proxy"
+name = "cereo-ai-proxy"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -14,4 +14,4 @@ id = "REMPLACER_PAR_L_ID_RENVOYE_PAR_WRANGLER"
 # Secrets à définir avec `npx wrangler secret put <NOM>` (jamais dans ce fichier) :
 #   ANTHROPIC_API_KEY — clé API Anthropic (console.anthropic.com)
 #   APP_TOKEN          — jeton partagé, le même que celui collé dans les
-#                         Paramètres de l'application Céréma sur chaque poste
+#                         Paramètres de l'application Céréo sur chaque poste

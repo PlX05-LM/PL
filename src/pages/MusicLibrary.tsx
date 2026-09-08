@@ -76,7 +76,7 @@ export default function MusicLibrary() {
             <h3 className="font-display text-lg text-fg">Bibliothèque libre de droit</h3>
             <p className="mt-1 text-sm text-muted">
               20 compositions originales pensées pour les temps forts d'une cérémonie
-              (entrée, recueillement, hommage, sortie) — créées pour Céréma, 100 % libres
+              (entrée, recueillement, hommage, sortie) — créées pour Céréo, 100 % libres
               de droit, utilisables sans restriction dans un cadre professionnel. Partagée par
               toutes les cérémonies.
             </p>

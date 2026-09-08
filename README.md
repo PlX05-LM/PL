@@ -1,4 +1,4 @@
-# Céréma — logiciel de régie pour maîtres de cérémonie
+# Céréo — logiciel de régie pour maîtres de cérémonie
 
 Application web (PC et tablette) pensée pour les maîtres de cérémonie du funéraire : elle permet de préparer le déroulé d'une cérémonie, d'y associer musiques et photos, puis de la piloter en direct le jour J.
 
@@ -78,7 +78,7 @@ identifiant depuis l'écran de connexion, jusqu'à la limite achetée.
 
 ## Génération de texte par IA (optionnelle)
 
-Céréma reste par défaut un logiciel 100% local et hors-ligne — l'IA n'est qu'une
+Céréo reste par défaut un logiciel 100% local et hors-ligne — l'IA n'est qu'une
 option, jamais un passage obligé. Pour l'activer :
 
 1. Déployez le service fourni dans le dossier [`worker/`](./worker) (un « worker »

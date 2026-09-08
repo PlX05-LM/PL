@@ -2,7 +2,7 @@ import { PUBLIC_KEY_JWK } from './publicKey'
 import { base64UrlToBytes } from './crypto'
 import type { LicensePayload } from './types'
 
-const PREFIX = 'CEREMA-'
+const PREFIX = 'CEREO-'
 
 let cachedKey: CryptoKey | null = null
 

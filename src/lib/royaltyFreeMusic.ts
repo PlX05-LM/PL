@@ -3,7 +3,7 @@ import { audioBufferToWavBlob } from './wavEncode'
 import type { Track } from '../types'
 
 export const BUILT_IN_LICENSE =
-  'Composition originale générée pour Céréma — libre de droit, usage professionnel autorisé sans restriction.'
+  'Composition originale générée pour Céréo — libre de droit, usage professionnel autorisé sans restriction.'
 
 const NATURAL_MINOR = [0, 2, 3, 5, 7, 8, 10]
 const DORIAN = [0, 2, 3, 5, 7, 9, 10]
@@ -596,7 +596,7 @@ async function buildTrack(spec: TrackSpec): Promise<Track> {
   return {
     id: builtInTrackId(spec.slug),
     name: spec.title,
-    artist: 'Céréma',
+    artist: 'Céréo',
     blob,
     mimeType: 'audio/wav',
     duration: buffer.duration,
