@@ -290,6 +290,27 @@ html.js .reveal.visible {
 
 .illu { width: 100%; max-width: 220px; }
 
+.col-portrait {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.portrait-img {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+}
+
+.portrait-caption {
+  margin: 14px 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
 .col-text h2 { margin-top: 0; }
 .col-text p { color: var(--ink-soft); }
 
@@ -509,6 +530,7 @@ html.js .reveal.visible {
   .cards { grid-template-columns: 1fr; }
   .venues { grid-template-columns: 1fr; }
   .col-illustration { order: -1; max-width: 160px; margin: 0 auto 24px; }
+  .col-portrait { order: -1; margin: 0 auto 24px; }
 
   .nav-toggle { display: flex; }
 
