@@ -79,6 +79,9 @@ export default function LiveMode() {
   const [duration, setDuration] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const audioUrlRef = useRef<string | null>(null)
+  // Piste réellement chargée dans le lecteur (peut différer de celle affichée).
+  const loadedTrackIdRef = useRef<string | null>(null)
+  const [audioError, setAudioError] = useState<string | null>(null)
 
   const audioOutputCapability = useMemo(() => detectAudioOutputCapability(), [])
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
@@ -115,6 +118,28 @@ export default function LiveMode() {
   const [showChecklist, setShowChecklist] = useState(false)
 
   const [musicTab, setMusicTab] = useState<'player' | 'library'>('player')
+
+  // Onglets de la colonne de droite, mémorisés d'une cérémonie à l'autre.
+  type PanelTab = 'musique' | 'diaporama' | 'fixe' | 'video'
+  const [panelTab, setPanelTab] = useState<PanelTab>(() => {
+    try {
+      const saved = localStorage.getItem('cereo-live-panel-tab')
+      if (saved === 'musique' || saved === 'diaporama' || saved === 'fixe' || saved === 'video') {
+        return saved
+      }
+    } catch {
+      // stockage indisponible : onglet par défaut
+    }
+    return 'musique'
+  })
+  function selectPanelTab(tab: PanelTab) {
+    setPanelTab(tab)
+    try {
+      localStorage.setItem('cereo-live-panel-tab', tab)
+    } catch {
+      // préférence non mémorisée, sans conséquence
+    }
+  }
   const [musicSearch, setMusicSearch] = useState('')
 
   const segments = ceremony?.segments ?? []
@@ -288,8 +313,18 @@ export default function LiveMode() {
     audioUrlRef.current = url
     const audio = ensureAudioElement()
     audio.src = url
+    loadedTrackIdRef.current = trackId
+    setAudioError(null)
+    setProgress(0)
+    setDuration(track.duration ?? 0)
     audio.volume = volume
     audio.onended = () => setIsPlaying(false)
+    audio.onerror = () => {
+      setIsPlaying(false)
+      setAudioError(
+        `« ${track.name} » ne peut pas être lue par ce navigateur. Convertissez-la en MP3 et réimportez-la.`,
+      )
+    }
     audio.ontimeupdate = () => setProgress(audio.currentTime)
     audio.onloadedmetadata = () => {
       resolveAudioDuration(audio).then(setDuration)
@@ -300,11 +335,30 @@ export default function LiveMode() {
     setManualTrackId(trackId)
   }
 
+  function startPlayback() {
+    const audio = audioRef.current
+    if (!audio) return
+    setIsPlaying(true)
+    audio.play().catch((err: unknown) => {
+      setIsPlaying(false)
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        setAudioError('Le navigateur a bloqué la lecture : touchez ▶ une nouvelle fois.')
+      } else if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        setAudioError('Lecture impossible : ce fichier audio n’est pas lisible par ce navigateur. Convertissez-le en MP3 et réimportez-le.')
+      }
+    })
+  }
+
   function loadAndPlayTrack(trackId: string) {
     loadTrack(trackId)
-    audioRef.current?.play()
-    setIsPlaying(true)
+    startPlayback()
   }
+
+  // En changeant d'étape sans musique en cours, le lecteur propose la musique de l'étape.
+  useEffect(() => {
+    if (!isPlaying) setManualTrackId('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segmentIndex])
 
   // --- Sortie audio (enceinte Bluetooth, système son de la salle, AirPlay...) ---
   useEffect(() => {
@@ -337,10 +391,13 @@ export default function LiveMode() {
 
   function togglePlay() {
     const audio = audioRef.current
-    if (!audio) return
+    // La musique affichée (celle de l'étape) n'est pas encore chargée : on la charge.
+    if (!audio || (activeTrackId && loadedTrackIdRef.current !== activeTrackId)) {
+      if (activeTrackId) loadAndPlayTrack(activeTrackId)
+      return
+    }
     if (audio.paused) {
-      audio.play()
-      setIsPlaying(true)
+      startPlayback()
     } else {
       audio.pause()
       setIsPlaying(false)
@@ -525,8 +582,7 @@ export default function LiveMode() {
       if (isPlaying) fadeOut()
     } else if (!isPlaying && activeTrackId) {
       // Vidéo muette : la musique de l'étape l'accompagne.
-      if (audioRef.current?.src) togglePlay()
-      else loadAndPlayTrack(activeTrackId)
+      togglePlay()
     }
     if (videoStatus?.ended) sendVideoCmd({ cmd: 'seek', time: 0 })
     sendVideoCmd({ cmd: 'play' })
@@ -681,6 +737,44 @@ export default function LiveMode() {
   }
 
   const totalEstimated = segments.reduce((s, seg) => s + seg.estimatedDuration * 60, 0)
+
+  const panelTabs: {
+    key: PanelTab
+    label: string
+    icon: 'music' | 'film' | 'pin' | 'video'
+    onAir: boolean
+    dotClass: string
+  }[] = [
+    { key: 'musique', label: 'Musique', icon: 'music', onAir: isPlaying, dotClass: 'bg-gold' },
+    {
+      key: 'diaporama',
+      label: 'Diaporama',
+      icon: 'film',
+      onAir: photoMode === 'diaporama' && !blackout,
+      dotClass: 'bg-gold',
+    },
+    {
+      key: 'fixe',
+      label: 'Photo fixe',
+      icon: 'pin',
+      onAir: photoMode === 'fixe' && !blackout,
+      dotClass: 'bg-sky-400',
+    },
+    {
+      key: 'video',
+      label: 'Vidéo',
+      icon: 'video',
+      onAir: photoMode === 'video' && !blackout,
+      dotClass: 'bg-sky-400',
+    },
+  ]
+  const onScreenLabel = blackout
+    ? 'Écran noir'
+    : photoMode === 'fixe'
+      ? 'Photo fixe'
+      : photoMode === 'video'
+        ? 'Vidéo'
+        : 'Diaporama'
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-ink text-fg">
@@ -873,318 +967,477 @@ export default function LiveMode() {
         </section>
 
         {/* Musique + diaporama */}
-        <aside className="flex flex-col gap-6 overflow-y-auto border-l border-line bg-panel p-4">
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-xs uppercase tracking-wide text-muted">Musique</h2>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setMusicTab('player')}
-                  className={`rounded px-2 py-0.5 text-[11px] ${
-                    musicTab === 'player' ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
-                  }`}
-                >
-                  Lecteur
-                </button>
-                <button
-                  onClick={() => setMusicTab('library')}
-                  className={`rounded px-2 py-0.5 text-[11px] ${
-                    musicTab === 'library' ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
-                  }`}
-                >
-                  Bibliothèque ({selectableTracks.length})
-                </button>
-              </div>
-            </div>
-
-            {musicTab === 'library' && (
-              <div>
-                <input
-                  value={musicSearch}
-                  onChange={(e) => setMusicSearch(e.target.value)}
-                  placeholder="Rechercher une musique…"
-                  className="mb-2 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-sm text-fg outline-none focus:border-gold-dim"
-                />
-                <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
-                  {libraryTracks.length === 0 && (
-                    <p className="py-4 text-center text-xs text-muted">Aucune musique trouvée.</p>
-                  )}
-                  {libraryTracks.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => loadAndPlayTrack(t.id)}
-                      className={`flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors ${
-                        activeTrackId === t.id
-                          ? 'border-gold-dim bg-panel-2 text-gold'
-                          : 'border-line text-fg hover:bg-panel-2'
-                      }`}
-                    >
-                      <span className="truncate">
-                        {activeTrackId === t.id && isPlaying ? '▶ ' : ''}
-                        {t.name}
-                      </span>
-                      <span className="shrink-0 font-mono text-muted">{formatClock(t.duration ?? NaN)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {musicTab === 'player' && (
-              <>
-                <select
-                  value={activeTrackId}
-                  onChange={(e) => loadTrack(e.target.value)}
-                  className="w-full rounded-md border border-line bg-panel-2 px-2 py-2 text-sm text-fg outline-none focus:border-gold-dim"
-                >
-                  <option value="">— Choisir une musique —</option>
-                  {selectableTracks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-                {activeTrack && (
-              <div className="mt-3 rounded-md border border-line bg-panel-2 p-3">
-                <p className="mb-2 truncate text-sm text-fg">{activeTrack.name}</p>
-                <div className="mb-2 flex items-center gap-2">
-                  <button
-                    onClick={togglePlay}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-gold-dim text-gold hover:bg-panel"
-                  >
-                    {isPlaying ? '❚❚' : '▶'}
-                  </button>
-                  <span className="font-mono text-xs text-muted">
-                    {formatClock(progress)} / {formatClock(duration || 0)}
-                  </span>
-                  <button
-                    onClick={fadeOut}
-                    className="ml-auto rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
-                  >
-                    Fondu ↘
-                  </button>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={volume}
-                  onChange={(e) => {
-                    const v = Number(e.target.value)
-                    setVolume(v)
-                    if (audioRef.current) audioRef.current.volume = v
-                  }}
-                  className="w-full"
-                />
-              </div>
-            )}
-            {audioOutputCapability === 'sink-select' && (
-              <div className="mt-3">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs text-muted">Sortie audio</span>
-                  <button
-                    onClick={detectAudioDevices}
-                    disabled={detectingDevices}
-                    className="flex items-center gap-1 rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-fg disabled:opacity-50"
-                  >
-                    {detectingDevices ? (
-                      '…'
-                    ) : (
-                      <>
-                        <Icon name="refresh" className="h-3 w-3" />
-                        Détecter
-                      </>
-                    )}
-                  </button>
-                </div>
-                <select
-                  value={selectedSinkId}
-                  onChange={(e) => selectAudioOutput(e.target.value)}
-                  className="w-full rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
-                >
-                  <option value="">Par défaut</option>
-                  {audioDevices.map((d, i) => (
-                    <option key={d.deviceId || i} value={d.deviceId}>
-                      {d.label || `Sortie ${i + 1}`}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-[10px] text-muted">
-                  Enceinte Bluetooth, TV, système son… « Détecter » demande une
-                  autorisation micro (jamais utilisée) pour afficher les noms.
-                </p>
-              </div>
-            )}
-            {audioOutputCapability === 'airplay' && (
-              <div className="mt-3">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs text-muted">Sortie audio</span>
-                  {airplayActive && <span className="text-[10px] text-gold">● Connecté</span>}
-                </div>
-                <button
-                  onClick={openAirPlayPicker}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gold-dim px-2 py-1.5 text-xs text-gold hover:bg-panel"
-                >
-                  <Icon name="wireless" className="h-3.5 w-3.5" />
-                  AirPlay / Bluetooth…
-                </button>
-                <p className="mt-1 text-[10px] text-muted">
-                  {isApplePlatform()
-                    ? "Ouvre le sélecteur système d'iPhone/iPad : enceintes AirPlay et Bluetooth déjà appairées."
-                    : "Ouvre le sélecteur système du navigateur pour choisir la sortie audio (AirPlay, Bluetooth)."}
-                </p>
-              </div>
-            )}
-              </>
-            )}
-          </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-xs uppercase tracking-wide text-muted">Diaporama</h2>
-              <span className="flex items-center gap-2 text-xs text-muted">
-                {photoMode === 'diaporama' && (
-                  <span className="rounded-full border border-gold px-2 py-0.5 text-[10px] text-gold">
-                    À l'écran
-                  </span>
-                )}
-                {slidePhotos.length > 0 ? `${slideIndex + 1}/${slidePhotos.length}` : '0/0'}
-              </span>
-            </div>
-
-            {photoMode !== 'diaporama' && (
+        <aside className="flex flex-col overflow-hidden border-l border-line bg-panel">
+          <nav className="grid shrink-0 grid-cols-4 border-b border-line">
+            {panelTabs.map((tab) => (
               <button
-                onClick={showSlideshow}
-                className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-gold-dim px-2 py-1.5 text-xs font-medium text-gold hover:bg-panel-2"
-              >
-                <Icon name="film" className="h-3.5 w-3.5" />
-                Revenir au diaporama
-              </button>
-            )}
-
-            {slidePhotos[slideIndex] && (
-              <div
-                className={`mb-2 aspect-video overflow-hidden rounded-md border bg-black ${
-                  photoMode === 'diaporama' ? 'border-gold' : 'border-line opacity-60'
+                key={tab.key}
+                onClick={() => selectPanelTab(tab.key)}
+                title={tab.onAir ? `${tab.label} — en cours` : tab.label}
+                className={`relative flex flex-col items-center gap-1 px-1 py-2.5 text-[11px] transition-colors ${
+                  panelTab === tab.key
+                    ? 'bg-panel-2 text-gold'
+                    : 'text-muted hover:bg-panel-2 hover:text-fg'
                 }`}
               >
-                <PhotoPreview blob={slidePhotos[slideIndex].blob} />
+                <Icon name={tab.icon} className="h-4 w-4" />
+                {tab.label}
+                {tab.onAir && (
+                  <span
+                    className={`absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full ${tab.dotClass}`}
+                  />
+                )}
+                {panelTab === tab.key && (
+                  <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-gold" />
+                )}
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex-1 overflow-y-auto p-4">
+            {panelTab === 'musique' && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-xs uppercase tracking-wide text-muted">Musique</h2>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setMusicTab('player')}
+                      className={`rounded px-2 py-0.5 text-[11px] ${
+                        musicTab === 'player' ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
+                      }`}
+                    >
+                      Lecteur
+                    </button>
+                    <button
+                      onClick={() => setMusicTab('library')}
+                      className={`rounded px-2 py-0.5 text-[11px] ${
+                        musicTab === 'library' ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
+                      }`}
+                    >
+                      Bibliothèque ({selectableTracks.length})
+                    </button>
+                  </div>
+                </div>
+
+                {musicTab === 'library' && (
+                  <div>
+                    <input
+                      value={musicSearch}
+                      onChange={(e) => setMusicSearch(e.target.value)}
+                      placeholder="Rechercher une musique…"
+                      className="mb-2 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-sm text-fg outline-none focus:border-gold-dim"
+                    />
+                    <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
+                      {libraryTracks.length === 0 && (
+                        <p className="py-4 text-center text-xs text-muted">Aucune musique trouvée.</p>
+                      )}
+                      {libraryTracks.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => loadAndPlayTrack(t.id)}
+                          className={`flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors ${
+                            activeTrackId === t.id
+                              ? 'border-gold-dim bg-panel-2 text-gold'
+                              : 'border-line text-fg hover:bg-panel-2'
+                          }`}
+                        >
+                          <span className="truncate">
+                            {activeTrackId === t.id && isPlaying ? '▶ ' : ''}
+                            {t.name}
+                          </span>
+                          <span className="shrink-0 font-mono text-muted">{formatClock(t.duration ?? NaN)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {musicTab === 'player' && (
+                  <>
+                    <select
+                      value={activeTrackId}
+                      onChange={(e) => loadTrack(e.target.value)}
+                      className="w-full rounded-md border border-line bg-panel-2 px-2 py-2 text-sm text-fg outline-none focus:border-gold-dim"
+                    >
+                      <option value="">— Choisir une musique —</option>
+                      {selectableTracks.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    {activeTrack && (
+                  <div className="mt-3 rounded-md border border-line bg-panel-2 p-3">
+                    <p className="mb-2 truncate text-sm text-fg">{activeTrack.name}</p>
+                    {audioError && (
+                      <p className="mb-2 rounded-md border border-danger px-2 py-1.5 text-[11px] text-danger">
+                        {audioError}
+                      </p>
+                    )}
+                    <div className="mb-2 flex items-center gap-2">
+                      <button
+                        onClick={togglePlay}
+                        className="flex h-9 w-9 items-center justify-center rounded-full border border-gold-dim text-gold hover:bg-panel"
+                      >
+                        {isPlaying ? '❚❚' : '▶'}
+                      </button>
+                      <span className="font-mono text-xs text-muted">
+                        {formatClock(progress)} / {formatClock(duration || 0)}
+                      </span>
+                      <button
+                        onClick={fadeOut}
+                        className="ml-auto rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
+                      >
+                        Fondu ↘
+                      </button>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={volume}
+                      onChange={(e) => {
+                        const v = Number(e.target.value)
+                        setVolume(v)
+                        if (audioRef.current) audioRef.current.volume = v
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+                {audioOutputCapability === 'sink-select' && (
+                  <div className="mt-3">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-xs text-muted">Sortie audio</span>
+                      <button
+                        onClick={detectAudioDevices}
+                        disabled={detectingDevices}
+                        className="flex items-center gap-1 rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:text-fg disabled:opacity-50"
+                      >
+                        {detectingDevices ? (
+                          '…'
+                        ) : (
+                          <>
+                            <Icon name="refresh" className="h-3 w-3" />
+                            Détecter
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <select
+                      value={selectedSinkId}
+                      onChange={(e) => selectAudioOutput(e.target.value)}
+                      className="w-full rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
+                    >
+                      <option value="">Par défaut</option>
+                      {audioDevices.map((d, i) => (
+                        <option key={d.deviceId || i} value={d.deviceId}>
+                          {d.label || `Sortie ${i + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[10px] text-muted">
+                      Enceinte Bluetooth, TV, système son… « Détecter » demande une
+                      autorisation micro (jamais utilisée) pour afficher les noms.
+                    </p>
+                  </div>
+                )}
+                {audioOutputCapability === 'airplay' && (
+                  <div className="mt-3">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-xs text-muted">Sortie audio</span>
+                      {airplayActive && <span className="text-[10px] text-gold">● Connecté</span>}
+                    </div>
+                    <button
+                      onClick={openAirPlayPicker}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gold-dim px-2 py-1.5 text-xs text-gold hover:bg-panel"
+                    >
+                      <Icon name="wireless" className="h-3.5 w-3.5" />
+                      AirPlay / Bluetooth…
+                    </button>
+                    <p className="mt-1 text-[10px] text-muted">
+                      {isApplePlatform()
+                        ? "Ouvre le sélecteur système d'iPhone/iPad : enceintes AirPlay et Bluetooth déjà appairées."
+                        : "Ouvre le sélecteur système du navigateur pour choisir la sortie audio (AirPlay, Bluetooth)."}
+                    </p>
+                  </div>
+                )}
+                  </>
+                )}
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={goToPrevSlide}
-                className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
-              >
-                ⏮
-              </button>
-              <button
-                onClick={toggleSlideshowPlaying}
-                className="flex-1 rounded-md border border-gold-dim px-2 py-1 text-xs text-gold hover:bg-panel-2"
-              >
-                {slidesPlaying ? 'Pause diaporama' : 'Lancer diaporama'}
-              </button>
-              <button
-                onClick={goToNextSlide}
-                className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
-              >
-                ⏭
-              </button>
-            </div>
-          </div>
+            {panelTab === 'diaporama' && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-xs uppercase tracking-wide text-muted">Diaporama</h2>
+                  <span className="flex items-center gap-2 text-xs text-muted">
+                    {photoMode === 'diaporama' && (
+                      <span className="rounded-full border border-gold px-2 py-0.5 text-[10px] text-gold">
+                        À l'écran
+                      </span>
+                    )}
+                    {slidePhotos.length > 0 ? `${slideIndex + 1}/${slidePhotos.length}` : '0/0'}
+                  </span>
+                </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-xs uppercase tracking-wide text-muted">Photo fixe</h2>
-              {photoMode === 'fixe' && (
-                <span className="rounded-full border border-sky-400 px-2 py-0.5 text-[10px] text-sky-400">
-                  À l'écran
-                </span>
-              )}
-            </div>
+                {photoMode !== 'diaporama' && (
+                  <button
+                    onClick={showSlideshow}
+                    className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-gold-dim px-2 py-1.5 text-xs font-medium text-gold hover:bg-panel-2"
+                  >
+                    <Icon name="film" className="h-3.5 w-3.5" />
+                    Revenir au diaporama
+                  </button>
+                )}
 
-            {ceremonyPhotos.length === 0 ? (
-              <p className="text-xs text-muted">
-                Aucune photo importée pour cette cérémonie.
-              </p>
-            ) : (
-              <>
-                <div
-                  className={`mb-2 aspect-video overflow-hidden rounded-md border bg-black ${
-                    photoMode === 'fixe' ? 'border-sky-400' : 'border-line'
-                  }`}
-                >
-                  {fixedPhoto ? (
-                    <PhotoPreview blob={fixedPhoto.blob} />
-                  ) : (
-                    <p className="flex h-full items-center justify-center px-3 text-center text-[11px] text-muted">
-                      Choisissez une photo ci-dessous
-                    </p>
+                {slidePhotos[slideIndex] && (
+                  <div
+                    className={`mb-2 aspect-video overflow-hidden rounded-md border bg-black ${
+                      photoMode === 'diaporama' ? 'border-gold' : 'border-line opacity-60'
+                    }`}
+                  >
+                    <PhotoPreview blob={slidePhotos[slideIndex].blob} />
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={goToPrevSlide}
+                    className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
+                  >
+                    ⏮
+                  </button>
+                  <button
+                    onClick={toggleSlideshowPlaying}
+                    className="flex-1 rounded-md border border-gold-dim px-2 py-1 text-xs text-gold hover:bg-panel-2"
+                  >
+                    {slidesPlaying ? 'Pause diaporama' : 'Lancer diaporama'}
+                  </button>
+                  <button
+                    onClick={goToNextSlide}
+                    className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
+                  >
+                    ⏭
+                  </button>
+                </div>
+              </div>
+            )}
+            {panelTab === 'fixe' && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-xs uppercase tracking-wide text-muted">Photo fixe</h2>
+                  {photoMode === 'fixe' && (
+                    <span className="rounded-full border border-sky-400 px-2 py-0.5 text-[10px] text-sky-400">
+                      À l'écran
+                    </span>
                   )}
                 </div>
 
-                {currentSegment?.screen === 'fixe' && currentSegment.fixedPhotoId && (
-                  <p className="mb-1 text-[10px] text-muted">
-                    Photo prévue pour l'étape « {currentSegment.title} » :{' '}
-                    {currentSegment.fixedPhotoId === fixedPhoto?.id ? 'sélectionnée' : (
-                      <button
-                        onClick={() => setLiveFixedPhotoId(currentSegment.fixedPhotoId)}
-                        className="text-sky-400 underline"
-                      >
-                        la reprendre
-                      </button>
-                    )}
+                {ceremonyPhotos.length === 0 ? (
+                  <p className="text-xs text-muted">
+                    Aucune photo importée pour cette cérémonie.
                   </p>
-                )}
+                ) : (
+                  <>
+                    <div
+                      className={`mb-2 aspect-video overflow-hidden rounded-md border bg-black ${
+                        photoMode === 'fixe' ? 'border-sky-400' : 'border-line'
+                      }`}
+                    >
+                      {fixedPhoto ? (
+                        <PhotoPreview blob={fixedPhoto.blob} />
+                      ) : (
+                        <p className="flex h-full items-center justify-center px-3 text-center text-[11px] text-muted">
+                          Choisissez une photo ci-dessous
+                        </p>
+                      )}
+                    </div>
 
-                <div className="mb-2 grid max-h-40 grid-cols-4 gap-1 overflow-y-auto">
-                  {ceremonyPhotos.map((p) => {
-                    const isCurrent = fixedPhoto?.id === p.id
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => (photoMode === 'fixe' ? showFixedPhoto(p.id) : setLiveFixedPhotoId(p.id))}
-                        title={
-                          photoMode === 'fixe'
-                            ? 'Afficher cette photo à l’écran'
-                            : 'Choisir comme photo fixe (sans l’afficher)'
-                        }
-                        className={`aspect-square overflow-hidden rounded border-2 ${
-                          isCurrent ? 'border-sky-400' : 'border-transparent hover:border-line'
-                        }`}
-                      >
-                        <PhotoPreview blob={p.blob} cover />
-                      </button>
-                    )
-                  })}
+                    {currentSegment?.screen === 'fixe' && currentSegment.fixedPhotoId && (
+                      <p className="mb-1 text-[10px] text-muted">
+                        Photo prévue pour l'étape « {currentSegment.title} » :{' '}
+                        {currentSegment.fixedPhotoId === fixedPhoto?.id ? 'sélectionnée' : (
+                          <button
+                            onClick={() => setLiveFixedPhotoId(currentSegment.fixedPhotoId)}
+                            className="text-sky-400 underline"
+                          >
+                            la reprendre
+                          </button>
+                        )}
+                      </p>
+                    )}
+
+                    <div className="mb-2 grid max-h-40 grid-cols-4 gap-1 overflow-y-auto">
+                      {ceremonyPhotos.map((p) => {
+                        const isCurrent = fixedPhoto?.id === p.id
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => (photoMode === 'fixe' ? showFixedPhoto(p.id) : setLiveFixedPhotoId(p.id))}
+                            title={
+                              photoMode === 'fixe'
+                                ? 'Afficher cette photo à l’écran'
+                                : 'Choisir comme photo fixe (sans l’afficher)'
+                            }
+                            className={`aspect-square overflow-hidden rounded border-2 ${
+                              isCurrent ? 'border-sky-400' : 'border-transparent hover:border-line'
+                            }`}
+                          >
+                            <PhotoPreview blob={p.blob} cover />
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => (photoMode === 'fixe' ? showSlideshow() : showFixedPhoto())}
+                      disabled={photoMode !== 'fixe' && !fixedPhoto}
+                      className={`flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
+                        photoMode === 'fixe'
+                          ? 'border-line text-muted hover:text-fg'
+                          : 'border-sky-400 text-sky-400 hover:bg-panel-2'
+                      }`}
+                    >
+                      <Icon name="pin" className="h-3.5 w-3.5" />
+                      {photoMode === 'fixe' ? 'Masquer la photo fixe' : 'Afficher la photo fixe'}
+                    </button>
+                    <p className="mt-1 text-[10px] text-muted">
+                      {photoMode === 'fixe'
+                        ? 'Touchez une vignette pour changer la photo à l’écran.'
+                        : 'Touchez une vignette pour la préparer, puis affichez-la.'}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+            {panelTab === 'video' && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-xs uppercase tracking-wide text-muted">Vidéo</h2>
+                  {photoMode === 'video' && (
+                    <span className="rounded-full border border-sky-400 px-2 py-0.5 text-[10px] text-sky-400">
+                      À l'écran
+                    </span>
+                  )}
                 </div>
 
-                <button
-                  onClick={() => (photoMode === 'fixe' ? showSlideshow() : showFixedPhoto())}
-                  disabled={photoMode !== 'fixe' && !fixedPhoto}
-                  className={`flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
-                    photoMode === 'fixe'
-                      ? 'border-line text-muted hover:text-fg'
-                      : 'border-sky-400 text-sky-400 hover:bg-panel-2'
-                  }`}
-                >
-                  <Icon name="pin" className="h-3.5 w-3.5" />
-                  {photoMode === 'fixe' ? 'Masquer la photo fixe' : 'Afficher la photo fixe'}
-                </button>
-                <p className="mt-1 text-[10px] text-muted">
-                  {photoMode === 'fixe'
-                    ? 'Touchez une vignette pour changer la photo à l’écran.'
-                    : 'Touchez une vignette pour la préparer, puis affichez-la.'}
-                </p>
-              </>
+                {videos.length === 0 ? (
+                  <p className="text-xs text-muted">
+                    Aucune vidéo pour cette cérémonie. Importez-la dans l'éditeur de la cérémonie
+                    (ex. diaporama monté par la famille).
+                  </p>
+                ) : (
+                  <>
+                    <select
+                      value={videoChoiceId}
+                      onChange={(e) => setVideoChoiceId(e.target.value)}
+                      disabled={videoIsPlaying}
+                      className="mb-2 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-xs text-fg outline-none focus:border-gold-dim disabled:opacity-60"
+                    >
+                      {videos.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="mb-2 grid grid-cols-2 gap-1 rounded-md border border-line p-0.5 text-[11px]">
+                      {(
+                        [
+                          ['video', 'Son de la vidéo'],
+                          ['music', 'Musique de l’étape'],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <button
+                          key={value}
+                          onClick={() => setVideoSound(value)}
+                          className={`rounded px-2 py-1 ${
+                            videoSound === value ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {activeVideo && (
+                      <VideoProgress
+                        status={videoStatus?.videoId === activeVideo.id ? videoStatus : null}
+                        fallbackDuration={activeVideo.duration}
+                        onSeek={(time) => sendVideoCmd({ cmd: 'seek', time })}
+                      />
+                    )}
+
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        onClick={toggleVideoPlaying}
+                        disabled={!activeVideo}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-sky-400 px-2 py-1.5 text-xs font-medium text-sky-400 hover:bg-panel-2 disabled:opacity-40"
+                      >
+                        <Icon name="video" className="h-3.5 w-3.5" />
+                        {videoIsPlaying
+                          ? 'Pause vidéo'
+                          : photoMode === 'video' && videoStatus && videoStatus.currentTime > 0
+                            ? 'Reprendre la vidéo'
+                            : 'Lancer la vidéo'}
+                      </button>
+                      {photoMode === 'video' && (
+                        <button
+                          onClick={stopVideo}
+                          title="Arrête la vidéo et revient au diaporama ou à la photo fixe"
+                          className="rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:text-fg"
+                        >
+                          Arrêter
+                        </button>
+                      )}
+                    </div>
+
+                    {videoSound === 'video' && (
+                      <label className="mt-2 flex items-center gap-2 text-[11px] text-muted">
+                        Volume
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={videoVolume}
+                          onChange={(e) => setVideoVolume(Number(e.target.value))}
+                          className="flex-1 accent-sky-400"
+                        />
+                      </label>
+                    )}
+
+                    {videoStatus?.blocked && (
+                      <p className="mt-2 rounded-md border border-danger px-2 py-1.5 text-[11px] text-danger">
+                        Le navigateur bloque le son sur l'écran de projection : cliquez une fois sur
+                        cette fenêtre (ou passez-la en plein écran), puis relancez.
+                      </p>
+                    )}
+                    {photoMode === 'video' && !videoStatus && (
+                      <p className="mt-2 text-[11px] text-muted">
+                        Ouvrez la projection pour diffuser la vidéo.
+                      </p>
+                    )}
+                    <p className="mt-2 text-[10px] text-muted">
+                      {videoSound === 'video'
+                        ? 'La musique en cours s’efface quand la vidéo démarre.'
+                        : 'Vidéo sans son, accompagnée par la musique de l’étape.'}{' '}
+                      À la fin, retour automatique au diaporama.
+                    </p>
+                  </>
+                )}
+              </div>
             )}
           </div>
 
-          <div>
+          <div className="shrink-0 border-t border-line p-3">
+            <p className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted">
+              À l’écran
+              <span className="normal-case tracking-normal text-fg">{onScreenLabel}</span>
+            </p>
             <button
               onClick={toggleBlackoutState}
-              className={`mt-2 w-full rounded-md border px-2 py-1 text-xs ${
+              className={`w-full rounded-md border px-2 py-1.5 text-xs ${
                 blackout
                   ? 'border-danger text-danger'
                   : 'border-line text-muted hover:text-fg'
@@ -1192,123 +1445,6 @@ export default function LiveMode() {
             >
               {blackout ? 'Rétablir la projection' : 'Écran noir'}
             </button>
-          </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-xs uppercase tracking-wide text-muted">Vidéo</h2>
-              {photoMode === 'video' && (
-                <span className="rounded-full border border-sky-400 px-2 py-0.5 text-[10px] text-sky-400">
-                  À l'écran
-                </span>
-              )}
-            </div>
-
-            {videos.length === 0 ? (
-              <p className="text-xs text-muted">
-                Aucune vidéo pour cette cérémonie. Importez-la dans l'éditeur de la cérémonie
-                (ex. diaporama monté par la famille).
-              </p>
-            ) : (
-              <>
-                <select
-                  value={videoChoiceId}
-                  onChange={(e) => setVideoChoiceId(e.target.value)}
-                  disabled={videoIsPlaying}
-                  className="mb-2 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-xs text-fg outline-none focus:border-gold-dim disabled:opacity-60"
-                >
-                  {videos.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="mb-2 grid grid-cols-2 gap-1 rounded-md border border-line p-0.5 text-[11px]">
-                  {(
-                    [
-                      ['video', 'Son de la vidéo'],
-                      ['music', 'Musique de l’étape'],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      onClick={() => setVideoSound(value)}
-                      className={`rounded px-2 py-1 ${
-                        videoSound === value ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {activeVideo && (
-                  <VideoProgress
-                    status={videoStatus?.videoId === activeVideo.id ? videoStatus : null}
-                    fallbackDuration={activeVideo.duration}
-                    onSeek={(time) => sendVideoCmd({ cmd: 'seek', time })}
-                  />
-                )}
-
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    onClick={toggleVideoPlaying}
-                    disabled={!activeVideo}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-sky-400 px-2 py-1.5 text-xs font-medium text-sky-400 hover:bg-panel-2 disabled:opacity-40"
-                  >
-                    <Icon name="video" className="h-3.5 w-3.5" />
-                    {videoIsPlaying
-                      ? 'Pause vidéo'
-                      : photoMode === 'video' && videoStatus && videoStatus.currentTime > 0
-                        ? 'Reprendre la vidéo'
-                        : 'Lancer la vidéo'}
-                  </button>
-                  {photoMode === 'video' && (
-                    <button
-                      onClick={stopVideo}
-                      title="Arrête la vidéo et revient au diaporama ou à la photo fixe"
-                      className="rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:text-fg"
-                    >
-                      Arrêter
-                    </button>
-                  )}
-                </div>
-
-                {videoSound === 'video' && (
-                  <label className="mt-2 flex items-center gap-2 text-[11px] text-muted">
-                    Volume
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={videoVolume}
-                      onChange={(e) => setVideoVolume(Number(e.target.value))}
-                      className="flex-1 accent-sky-400"
-                    />
-                  </label>
-                )}
-
-                {videoStatus?.blocked && (
-                  <p className="mt-2 rounded-md border border-danger px-2 py-1.5 text-[11px] text-danger">
-                    Le navigateur bloque le son sur l'écran de projection : cliquez une fois sur
-                    cette fenêtre (ou passez-la en plein écran), puis relancez.
-                  </p>
-                )}
-                {photoMode === 'video' && !videoStatus && (
-                  <p className="mt-2 text-[11px] text-muted">
-                    Ouvrez la projection pour diffuser la vidéo.
-                  </p>
-                )}
-                <p className="mt-2 text-[10px] text-muted">
-                  {videoSound === 'video'
-                    ? 'La musique en cours s’efface quand la vidéo démarre.'
-                    : 'Vidéo sans son, accompagnée par la musique de l’étape.'}{' '}
-                  À la fin, retour automatique au diaporama.
-                </p>
-              </>
-            )}
           </div>
         </aside>
       </div>
