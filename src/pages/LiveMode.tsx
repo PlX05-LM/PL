@@ -638,6 +638,33 @@ export default function LiveMode() {
     returnFromVideo()
   }
 
+  // Un bouton de la régie touché volontairement passe toujours : il lève le cadenas
+  // sans rien demander. Le cadenas ne protège que des changements involontaires
+  // (changement d'étape, touche de télécommande).
+  function releaseLock() {
+    screenLockedRef.current = false
+    setScreenLocked(false)
+  }
+  function byHand(action: () => void) {
+    return () => {
+      releaseLock()
+      action()
+    }
+  }
+  function startSlideshowByHand() {
+    releaseLock()
+    if (photoMode !== 'diaporama') {
+      showSlideshow()
+      setSlidesPlaying(true)
+    } else {
+      toggleSlideshowPlaying()
+    }
+  }
+  /** Changer de photo fixe à la main : permis même verrouillé, le verrou reste en place. */
+  function pickFixedPhotoByHand(photoId: string) {
+    setLiveFixedPhotoId(photoId)
+  }
+
   function lockScreen() {
     if (photoMode !== 'fixe' || !fixedPhoto) return
     setBlackout(false)
@@ -645,8 +672,7 @@ export default function LiveMode() {
   }
 
   function unlockScreen() {
-    if (!confirm('Déverrouiller l’écran ? Les commandes de projection seront de nouveau actives.')) return
-    setScreenLocked(false)
+    releaseLock()
   }
 
   function toggleVideoPlaying() {
@@ -1236,7 +1262,7 @@ export default function LiveMode() {
 
                 {photoMode !== 'diaporama' && (
                   <button
-                    onClick={showSlideshow}
+                    onClick={byHand(showSlideshow)}
                     className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-gold-dim px-2 py-1.5 text-xs font-medium text-gold hover:bg-panel-2"
                   >
                     <Icon name="film" className="h-3.5 w-3.5" />
@@ -1261,10 +1287,10 @@ export default function LiveMode() {
                     ⏮
                   </button>
                   <button
-                    onClick={toggleSlideshowPlaying}
+                    onClick={startSlideshowByHand}
                     className="flex-1 rounded-md border border-gold-dim px-2 py-1 text-xs text-gold hover:bg-panel-2"
                   >
-                    {slidesPlaying ? 'Pause diaporama' : 'Lancer diaporama'}
+                    {slidesPlaying && photoMode === 'diaporama' ? 'Pause diaporama' : 'Lancer diaporama'}
                   </button>
                   <button
                     onClick={goToNextSlide}
@@ -1311,7 +1337,7 @@ export default function LiveMode() {
                         Photo prévue pour l'étape « {currentSegment.title} » :{' '}
                         {currentSegment.fixedPhotoId === fixedPhoto?.id ? 'sélectionnée' : (
                           <button
-                            onClick={() => !screenIsLocked() && setLiveFixedPhotoId(currentSegment.fixedPhotoId)}
+                            onClick={() => currentSegment.fixedPhotoId && pickFixedPhotoByHand(currentSegment.fixedPhotoId)}
                             className="text-sky-400 underline"
                           >
                             la reprendre
@@ -1327,9 +1353,7 @@ export default function LiveMode() {
                           <button
                             key={p.id}
                             onClick={() =>
-                          photoMode === 'fixe'
-                            ? showFixedPhoto(p.id)
-                            : !screenIsLocked() && setLiveFixedPhotoId(p.id)
+                          pickFixedPhotoByHand(p.id)
                         }
                             title={
                               photoMode === 'fixe'
@@ -1362,8 +1386,8 @@ export default function LiveMode() {
                       </button>
                     )}
                     <button
-                      onClick={() => (photoMode === 'fixe' ? showSlideshow() : showFixedPhoto())}
-                      disabled={screenLocked || (photoMode !== 'fixe' && !fixedPhoto)}
+                      onClick={byHand(() => (photoMode === 'fixe' ? showSlideshow() : showFixedPhoto()))}
+                      disabled={photoMode !== 'fixe' && !fixedPhoto}
                       className={`flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
                         photoMode === 'fixe'
                           ? 'border-line text-muted hover:text-fg'
@@ -1442,7 +1466,7 @@ export default function LiveMode() {
 
                     <div className="mt-2 flex items-center gap-2">
                       <button
-                        onClick={toggleVideoPlaying}
+                        onClick={byHand(toggleVideoPlaying)}
                         disabled={!activeVideo}
                         className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-sky-400 px-2 py-1.5 text-xs font-medium text-sky-400 hover:bg-panel-2 disabled:opacity-40"
                       >
@@ -1455,7 +1479,7 @@ export default function LiveMode() {
                       </button>
                       {photoMode === 'video' && (
                         <button
-                          onClick={stopVideo}
+                          onClick={byHand(stopVideo)}
                           title="Arrête la vidéo et revient au diaporama ou à la photo fixe"
                           className="rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:text-fg"
                         >
@@ -1522,8 +1546,7 @@ export default function LiveMode() {
               </button>
             )}
             <button
-              onClick={toggleBlackoutState}
-              disabled={screenLocked}
+              onClick={byHand(toggleBlackoutState)}
               className={`w-full rounded-md border px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${
                 blackout
                   ? 'border-danger text-danger'
