@@ -20,6 +20,8 @@ export type IconName =
   | 'document'
   | 'arrow-left'
   | 'video'
+  | 'lock'
+  | 'unlock'
 
 interface IconProps {
   name: IconName
@@ -155,6 +157,18 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M14 3v5h5" />
       <line x1="8" y1="13" x2="16" y2="13" />
       <line x1="8" y1="17" x2="16" y2="17" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="10" rx="1.5" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  unlock: (
+    <>
+      <rect x="5" y="11" width="14" height="10" rx="1.5" />
+      <path d="M8 11V8a4 4 0 0 1 7.5-1.9" />
     </>
   ),
   video: (

@@ -208,11 +208,7 @@ export default function Projector() {
       </button>
 
       {connected && mode === 'fixe' && fixedUrl && (
-        <div className="absolute inset-0">
-          <div
-            className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl brightness-50"
-            style={{ backgroundImage: `url(${fixedUrl})` }}
-          />
+        <div className="absolute inset-0 bg-black">
           <img src={fixedUrl} alt="" className="relative h-full w-full object-contain" />
         </div>
       )}
@@ -228,10 +224,6 @@ export default function Projector() {
               zIndex: i === index ? 1 : 0,
             }}
           >
-            <div
-              className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl brightness-50"
-              style={{ backgroundImage: `url(${s.url})` }}
-            />
             <img
               src={s.url}
               alt=""

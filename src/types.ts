@@ -153,6 +153,8 @@ export interface LiveState {
   photoMode: 'diaporama' | 'fixe'
   /** Photo fixe choisie en direct depuis la régie. */
   fixedPhotoId?: string
+  /** Écran verrouillé sur la photo fixe : aucune manipulation ne peut le changer. */
+  screenLocked?: boolean
 }
 
 export interface Ceremony {

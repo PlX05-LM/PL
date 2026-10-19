@@ -185,6 +185,27 @@ export default function LiveMode() {
 
   // Photo fixe choisie en direct ; à défaut, celle définie pour la cérémonie.
   const [liveFixedPhotoId, setLiveFixedPhotoId] = useState<string | undefined>(undefined)
+  // Cadenas : l'écran reste sur la photo fixe quoi qu'il arrive (fausse manipulation,
+  // touche de télécommande, changement d'étape...) tant qu'on ne l'a pas déverrouillé.
+  const [screenLocked, setScreenLocked] = useState(false)
+  const [lockNudge, setLockNudge] = useState(0)
+  /** Renvoie true (et signale le cadenas) si l'écran est verrouillé. */
+  function screenIsLocked() {
+    if (!screenLockedRef.current) return false
+    setLockNudge((n) => n + 1)
+    return true
+  }
+  const screenLockedRef = useRef(false)
+  const [lockFlash, setLockFlash] = useState(false)
+  useEffect(() => {
+    if (lockNudge === 0) return
+    setLockFlash(true)
+    const t = setTimeout(() => setLockFlash(false), 1200)
+    return () => clearTimeout(t)
+  }, [lockNudge])
+  useEffect(() => {
+    screenLockedRef.current = screenLocked
+  }, [screenLocked])
   const fixedPhoto = useMemo(() => {
     const fixedPhotoId = liveFixedPhotoId ?? ceremony?.slideshow.fixedPhotoId
     return fixedPhotoId ? allPhotos.find((p) => p.id === fixedPhotoId) ?? null : null
@@ -201,6 +222,7 @@ export default function LiveMode() {
       setBlackout(ls.blackout)
       setPhotoMode(ls.photoMode ?? 'diaporama')
       setLiveFixedPhotoId(ls.fixedPhotoId)
+      if (ls.screenLocked && ls.photoMode === 'fixe') setScreenLocked(true)
       if (ls.startedAt !== null) {
         setResumed(true)
         resumedFromStateRef.current = true
@@ -219,6 +241,7 @@ export default function LiveMode() {
         blackout: boolean
         photoMode: 'diaporama' | 'fixe'
         fixedPhotoId?: string
+        screenLocked?: boolean
       },
     ) => {
       db.ceremonies.update(id, { liveState: state, updatedAt: Date.now() })
@@ -238,9 +261,20 @@ export default function LiveMode() {
       blackout,
       photoMode: persistedMode,
       fixedPhotoId: liveFixedPhotoId,
+      screenLocked,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveStateHydrated, id, segmentIndex, startedAt, slideIndex, blackout, photoMode, liveFixedPhotoId])
+  }, [
+    liveStateHydrated,
+    id,
+    segmentIndex,
+    startedAt,
+    slideIndex,
+    blackout,
+    photoMode,
+    liveFixedPhotoId,
+    screenLocked,
+  ])
 
   // --- Elapsed time chrono ---
   useEffect(() => {
@@ -530,6 +564,8 @@ export default function LiveMode() {
 
   function applySegmentScreen(seg: (typeof segments)[number] | undefined) {
     if (!seg?.screen) return
+    // Écran verrouillé : l'étape change, l'écran non (sans alerte, c'est voulu).
+    if (screenLockedRef.current) return
     if (seg.screen === 'fixe' && seg.fixedPhotoId) setLiveFixedPhotoId(seg.fixedPhotoId)
     // Une vidéo en cours n'est jamais coupée par un changement d'étape.
     if (photoMode === 'video') return
@@ -549,12 +585,14 @@ export default function LiveMode() {
   }
 
   function showSlideshow() {
+    if (screenIsLocked()) return
     leaveVideoIfShown()
     setBlackout(false)
     setPhotoMode('diaporama')
   }
 
   function showFixedPhoto(photoId?: string) {
+    if (screenIsLocked()) return
     if (photoId) setLiveFixedPhotoId(photoId)
     leaveVideoIfShown()
     setBlackout(false)
@@ -570,6 +608,7 @@ export default function LiveMode() {
   }
 
   function playVideo() {
+    if (screenIsLocked()) return
     if (!activeVideo) return
     setPhotoMode((m) => {
       if (m !== 'video') modeBeforeVideoRef.current = m
@@ -593,9 +632,21 @@ export default function LiveMode() {
   }
 
   function stopVideo() {
+    if (screenIsLocked()) return
     sendVideoCmd({ cmd: 'pause' })
     sendVideoCmd({ cmd: 'seek', time: 0 })
     returnFromVideo()
+  }
+
+  function lockScreen() {
+    if (photoMode !== 'fixe' || !fixedPhoto) return
+    setBlackout(false)
+    setScreenLocked(true)
+  }
+
+  function unlockScreen() {
+    if (!confirm('Déverrouiller l’écran ? Les commandes de projection seront de nouveau actives.')) return
+    setScreenLocked(false)
   }
 
   function toggleVideoPlaying() {
@@ -666,6 +717,7 @@ export default function LiveMode() {
     setSlidesPlaying((p) => !p)
   }
   function togglePhotoModeState() {
+    if (screenIsLocked()) return
     if (photoMode === 'video') {
       stopVideo()
       return
@@ -674,6 +726,7 @@ export default function LiveMode() {
     setPhotoMode((m) => (m === 'diaporama' ? 'fixe' : 'diaporama'))
   }
   function toggleBlackoutState() {
+    if (screenIsLocked()) return
     setBlackout((b) => !b)
   }
   function toggleAutoScrollState() {
@@ -1258,7 +1311,7 @@ export default function LiveMode() {
                         Photo prévue pour l'étape « {currentSegment.title} » :{' '}
                         {currentSegment.fixedPhotoId === fixedPhoto?.id ? 'sélectionnée' : (
                           <button
-                            onClick={() => setLiveFixedPhotoId(currentSegment.fixedPhotoId)}
+                            onClick={() => !screenIsLocked() && setLiveFixedPhotoId(currentSegment.fixedPhotoId)}
                             className="text-sky-400 underline"
                           >
                             la reprendre
@@ -1273,7 +1326,11 @@ export default function LiveMode() {
                         return (
                           <button
                             key={p.id}
-                            onClick={() => (photoMode === 'fixe' ? showFixedPhoto(p.id) : setLiveFixedPhotoId(p.id))}
+                            onClick={() =>
+                          photoMode === 'fixe'
+                            ? showFixedPhoto(p.id)
+                            : !screenIsLocked() && setLiveFixedPhotoId(p.id)
+                        }
                             title={
                               photoMode === 'fixe'
                                 ? 'Afficher cette photo à l’écran'
@@ -1289,9 +1346,24 @@ export default function LiveMode() {
                       })}
                     </div>
 
+                    {photoMode === 'fixe' && fixedPhoto && (
+                      <button
+                        onClick={screenLocked ? unlockScreen : lockScreen}
+                        className={`mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-xs font-medium ${
+                          screenLocked
+                            ? 'border-gold bg-gold/10 text-gold'
+                            : 'border-line text-muted hover:border-gold-dim hover:text-fg'
+                        }`}
+                      >
+                        <Icon name={screenLocked ? 'lock' : 'unlock'} className="h-3.5 w-3.5" />
+                        {screenLocked
+                          ? 'Écran verrouillé — déverrouiller'
+                          : 'Verrouiller l’écran sur cette photo'}
+                      </button>
+                    )}
                     <button
                       onClick={() => (photoMode === 'fixe' ? showSlideshow() : showFixedPhoto())}
-                      disabled={photoMode !== 'fixe' && !fixedPhoto}
+                      disabled={screenLocked || (photoMode !== 'fixe' && !fixedPhoto)}
                       className={`flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
                         photoMode === 'fixe'
                           ? 'border-line text-muted hover:text-fg'
@@ -1433,11 +1505,26 @@ export default function LiveMode() {
           <div className="shrink-0 border-t border-line p-3">
             <p className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-wide text-muted">
               À l’écran
-              <span className="normal-case tracking-normal text-fg">{onScreenLabel}</span>
+              <span className="flex items-center gap-1.5 normal-case tracking-normal text-fg">
+                {screenLocked && <Icon name="lock" className="h-3 w-3 text-gold" />}
+                {onScreenLabel}
+              </span>
             </p>
+            {screenLocked && (
+              <button
+                onClick={unlockScreen}
+                className={`mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors ${
+                  lockFlash ? 'border-gold bg-gold text-ink' : 'border-gold text-gold hover:bg-panel-2'
+                }`}
+              >
+                <Icon name="lock" className="h-3.5 w-3.5" />
+                {lockFlash ? 'Écran verrouillé' : 'Déverrouiller l’écran'}
+              </button>
+            )}
             <button
               onClick={toggleBlackoutState}
-              className={`w-full rounded-md border px-2 py-1.5 text-xs ${
+              disabled={screenLocked}
+              className={`w-full rounded-md border px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${
                 blackout
                   ? 'border-danger text-danger'
                   : 'border-line text-muted hover:text-fg'
