@@ -45,6 +45,8 @@ export type ProjectorMessage =
   | ({ type: 'videoCmd' } & VideoCommand)
   | { type: 'videoVolume'; volume: number }
   | ({ type: 'videoStatus' } & VideoStatus)
+  /** État de la fenêtre de projection, renvoyé à la régie. */
+  | { type: 'projectorStatus'; fullscreen: boolean }
 
 export function channelNameFor(ceremonyId: string) {
   return `projector-${ceremonyId}`

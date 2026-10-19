@@ -8,6 +8,7 @@ import {
   type ProjectorPhoto,
 } from '../lib/projectorChannel'
 import { loadPreferredSink, setAudioSink } from '../lib/audioOutput'
+import { FULLSCREEN_REQUEST } from '../lib/screens'
 
 interface Slide {
   id: string
@@ -149,9 +150,32 @@ export default function Projector() {
   }, [])
 
   useEffect(() => {
-    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    const report = () =>
+      channelRef.current?.postMessage({
+        type: 'projectorStatus',
+        fullscreen: !!document.fullscreenElement,
+      } satisfies ProjectorMessage)
+    const onChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+      report()
+    }
     document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
+    // Plein écran demandé depuis la régie (droit transmis par le clic fait là-bas).
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.data?.type !== FULLSCREEN_REQUEST) return
+      if (document.fullscreenElement) {
+        report()
+        return
+      }
+      document.documentElement.requestFullscreen().catch(report)
+    }
+    window.addEventListener('message', onMessage)
+    const t = setTimeout(report, 300)
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange)
+      window.removeEventListener('message', onMessage)
+      clearTimeout(t)
+    }
   }, [])
 
   function toggleFullscreen() {

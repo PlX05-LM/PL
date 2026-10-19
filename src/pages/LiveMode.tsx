@@ -28,6 +28,15 @@ import {
 } from '../lib/audioOutput'
 import { isBuiltInTrackId, loadAppSettings } from '../lib/appSettings'
 import Icon from '../components/Icon'
+import {
+  delegateFullscreen,
+  getScreenDetailsIfGranted,
+  pickExternalScreen,
+  requestScreenDetails,
+  supportsScreenPlacement,
+  windowFeaturesFor,
+  type ScreenDetails,
+} from '../lib/screens'
 
 /** Mélange déterministe (même graine → même ordre) : stable pour une cérémonie donnée. */
 function seededShuffle<T>(items: T[], seed: string): T[] {
@@ -103,6 +112,10 @@ export default function LiveMode() {
   const [videoStatus, setVideoStatus] = useState<VideoStatus | null>(null)
   const lastSentVideoKeyRef = useRef<string>('')
   const projectorWindowRef = useRef<Window | null>(null)
+  const [projectorOpen, setProjectorOpen] = useState(false)
+  const [projectorFullscreen, setProjectorFullscreen] = useState(false)
+  const [projectorHint, setProjectorHint] = useState<string | null>(null)
+  const screenDetailsRef = useRef<ScreenDetails | null>(null)
 
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
@@ -697,6 +710,9 @@ export default function LiveMode() {
       } else if (msg.type === 'videoStatus') {
         const { type: _type, ...status } = msg
         setVideoStatus(status)
+      } else if (msg.type === 'projectorStatus') {
+        setProjectorOpen(true)
+        setProjectorFullscreen(msg.fullscreen)
       }
     }
     channelRef.current = channel
@@ -712,19 +728,84 @@ export default function LiveMode() {
     channelRef.current?.postMessage({ type: 'black', on: blackout } satisfies ProjectorMessage)
   }, [blackout])
 
-  function openProjector() {
+  // Écrans déjà autorisés : on les connaît sans rien demander.
+  useEffect(() => {
+    getScreenDetailsIfGranted().then((d) => {
+      screenDetailsRef.current = d
+    })
+  }, [])
+
+  // Fenêtre de projection fermée à la main : la régie le remarque.
+  useEffect(() => {
+    if (!projectorOpen) return
+    const t = setInterval(() => {
+      const w = projectorWindowRef.current
+      if (w && w.closed) {
+        projectorWindowRef.current = null
+        setProjectorOpen(false)
+        setProjectorFullscreen(false)
+      }
+    }, 1000)
+    return () => clearInterval(t)
+  }, [projectorOpen])
+
+  async function openProjector() {
     if (!id) return
+    setProjectorHint(null)
+    let details = screenDetailsRef.current
+    if (!details && supportsScreenPlacement()) {
+      // Première fois : le navigateur demande d'autoriser la gestion des écrans.
+      details = await requestScreenDetails()
+      screenDetailsRef.current = details
+    }
+    const target = details ? pickExternalScreen(details) : null
     // Avec HashRouter, l'URL de la route est après le #, pas un chemin absolu :
     // ça reste correct que l'appli soit servie à la racine d'un domaine ou
     // sous un sous-chemin (ex. GitHub Pages).
     const w = window.open(
       `${import.meta.env.BASE_URL}#/projector/${id}`,
       'ceremonia-projector',
-      'width=1280,height=720',
+      windowFeaturesFor(target),
     )
+    if (!w) {
+      setProjectorHint(
+        details
+          ? 'Autorisation enregistrée. Touchez à nouveau « Ouvrir la projection ».'
+          : 'Le navigateur a bloqué la fenêtre de projection : autorisez les fenêtres pop-up pour ce site, puis réessayez.',
+      )
+      return
+    }
+    if (target) {
+      try {
+        w.moveTo(target.availLeft, target.availTop)
+        w.resizeTo(target.availWidth, target.availHeight)
+      } catch {
+        // déplacement refusé : la fenêtre reste où le navigateur l'a ouverte
+      }
+    } else if (details && details.screens.length < 2) {
+      setProjectorHint(
+        'Un seul écran détecté. Branchez l’écran de la salle et choisissez « Étendre » (et non « Dupliquer ») dans les paramètres d’affichage, puis rouvrez la projection.',
+      )
+    } else if (!supportsScreenPlacement()) {
+      setProjectorHint(
+        'Ce navigateur ne sait pas choisir l’écran : faites glisser la fenêtre sur l’écran de la salle. Avec Chrome ou Edge, elle s’y place toute seule.',
+      )
+    }
     projectorWindowRef.current = w
+    setProjectorOpen(true)
+    setProjectorFullscreen(false)
     setTimeout(sendProjectorState, 500)
   }
+
+  function projectorGoFullscreen() {
+    const w = projectorWindowRef.current
+    if (!w || w.closed) {
+      openProjector()
+      return
+    }
+    delegateFullscreen(w)
+  }
+
 
   // --- Actions pilotables au clavier / à la télécommande ---
   function goToNextSegment() {
@@ -905,14 +986,33 @@ export default function LiveMode() {
               Réinitialiser
             </button>
           )}
-          <button
-            onClick={openProjector}
-            title="Ouvre une fenêtre à faire glisser sur l'écran externe (TV/vidéoprojecteur branché en HDMI, ou via un cast Chromecast/AirPlay), puis à passer en plein écran depuis cette fenêtre."
-            className="flex items-center gap-1.5 rounded-md border border-gold-dim px-3 py-1.5 text-sm text-gold hover:bg-panel-2"
-          >
-            <Icon name="monitor" className="h-4 w-4" />
-            Ouvrir la projection
-          </button>
+          {!projectorOpen ? (
+            <button
+              onClick={openProjector}
+              title="Ouvre la projection directement sur l'écran de la salle (TV / vidéoprojecteur branché en HDMI)."
+              className="flex items-center gap-1.5 rounded-md border border-gold-dim px-3 py-1.5 text-sm text-gold hover:bg-panel-2"
+            >
+              <Icon name="monitor" className="h-4 w-4" />
+              Ouvrir la projection
+            </button>
+          ) : !projectorFullscreen ? (
+            <button
+              onClick={projectorGoFullscreen}
+              title="Passe la projection en plein écran sur l'écran de la salle, sans toucher à sa fenêtre"
+              className="flex animate-pulse items-center gap-1.5 rounded-md bg-gold px-3 py-1.5 text-sm font-medium text-ink hover:bg-gold-dim"
+            >
+              <Icon name="monitor" className="h-4 w-4" />
+              Plein écran projection
+            </button>
+          ) : (
+            <span
+              title="Pour quitter le plein écran : touche Échap ou double-clic sur la projection"
+              className="flex items-center gap-1.5 rounded-md border border-gold-dim px-3 py-1.5 text-sm text-gold"
+            >
+              <Icon name="monitor" className="h-4 w-4" />
+              Projection en plein écran ✓
+            </span>
+          )}
           <button
             onClick={() => setShowRemoteSettings(true)}
             title="Configurer le clavier ou une télécommande de présentation pour piloter la régie sans toucher l'écran"
@@ -932,6 +1032,14 @@ export default function LiveMode() {
           )}
         </div>
       </header>
+      {projectorHint && (
+        <div className="flex items-center justify-between gap-4 border-b border-gold-dim bg-panel-2 px-5 py-2 text-xs text-fg">
+          <span>{projectorHint}</span>
+          <button onClick={() => setProjectorHint(null)} className="text-muted hover:text-fg">
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="grid flex-1 grid-cols-[260px_1fr_320px] overflow-hidden">
         {/* Déroulé */}
