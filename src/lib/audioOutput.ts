@@ -88,7 +88,7 @@ export async function unlockDeviceLabels(): Promise<boolean> {
   }
 }
 
-export async function setAudioSink(audio: HTMLAudioElement, deviceId: string): Promise<void> {
+export async function setAudioSink(audio: HTMLMediaElement, deviceId: string): Promise<void> {
   const el = audio as SinkCapableElement
   if (el.setSinkId) await el.setSinkId(deviceId)
 }

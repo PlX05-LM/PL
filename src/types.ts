@@ -39,6 +39,27 @@ export interface Photo {
   ceremonyId?: string
 }
 
+/**
+ * Vidéo importée pour une cérémonie (ex. diaporama monté par la famille). Projetée telle
+ * quelle, dans son format d'origine, avec sa propre bande-son ou en muet sur la musique
+ * de l'étape.
+ */
+export interface Video {
+  id: string
+  name: string
+  blob: Blob
+  mimeType: string
+  duration?: number
+  width?: number
+  height?: number
+  createdAt: number
+  /** Cérémonie à laquelle appartient cette vidéo — n'apparaît que dans cette cérémonie. */
+  ceremonyId?: string
+}
+
+/** Son pendant une vidéo : sa propre bande-son, ou muette sur la musique de l'étape. */
+export type VideoSound = 'video' | 'music'
+
 export interface SlideshowConfig {
   photoIds: string[]
   transition: TransitionType
@@ -63,6 +84,10 @@ export interface CeremonySegment {
   estimatedDuration: number // minutes
   trackId?: string
   notes?: string
+  /** Vidéo à projeter pendant cette étape (lancée depuis la régie, jamais automatiquement). */
+  videoId?: string
+  /** Par défaut, le son de la vidéo. */
+  videoSound?: VideoSound
 }
 
 export type CeremonyType = 'obseques' | 'creation' | 'inhumation' | 'hommage' | 'autre'

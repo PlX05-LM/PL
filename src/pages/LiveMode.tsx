@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import { channelNameFor, type PhotoDisplayMode, type ProjectorMessage } from '../lib/projectorChannel'
+import {
+  channelNameFor,
+  type PhotoDisplayMode,
+  type ProjectorMessage,
+  type VideoStatus,
+} from '../lib/projectorChannel'
+import type { VideoSound } from '../types'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { resolveAudioDuration } from '../lib/audioDuration'
 import { computePace, paceLabel } from '../lib/pace'
@@ -52,6 +58,11 @@ export default function LiveMode() {
   const ceremony = useLiveQuery(() => (id ? db.ceremonies.get(id) : undefined), [id])
   const tracks = useLiveQuery(() => db.tracks.toArray(), []) ?? []
   const allPhotos = useLiveQuery(() => db.photos.toArray(), []) ?? []
+  const videos =
+    useLiveQuery(
+      () => (id ? db.videos.where('ceremonyId').equals(id).sortBy('createdAt') : []),
+      [id],
+    ) ?? []
 
   const appSettings = useMemo(() => loadAppSettings(), [])
 
@@ -80,6 +91,14 @@ export default function LiveMode() {
   const [blackout, setBlackout] = useState(false)
   const [photoMode, setPhotoMode] = useState<PhotoDisplayMode>('diaporama')
   const channelRef = useRef<BroadcastChannel | null>(null)
+  // Affichage à retrouver quand la vidéo s'arrête (diaporama ou photo fixe).
+  const modeBeforeVideoRef = useRef<'diaporama' | 'fixe'>('diaporama')
+
+  const [videoChoiceId, setVideoChoiceId] = useState<string>('')
+  const [videoSound, setVideoSound] = useState<VideoSound>('video')
+  const [videoVolume, setVideoVolume] = useState(1)
+  const [videoStatus, setVideoStatus] = useState<VideoStatus | null>(null)
+  const lastSentVideoKeyRef = useRef<string>('')
   const projectorWindowRef = useRef<Window | null>(null)
 
   const [startedAt, setStartedAt] = useState<number | null>(null)
@@ -157,7 +176,7 @@ export default function LiveMode() {
         startedAt: number | null
         slideIndex: number
         blackout: boolean
-        photoMode: PhotoDisplayMode
+        photoMode: 'diaporama' | 'fixe'
       },
     ) => {
       db.ceremonies.update(id, { liveState: state, updatedAt: Date.now() })
@@ -167,7 +186,16 @@ export default function LiveMode() {
 
   useEffect(() => {
     if (!liveStateHydrated || !id) return
-    persistLiveState(id, { segmentIndex, startedAt, slideIndex, blackout, photoMode })
+    // La vidéo n'est jamais relancée automatiquement après une reprise : on mémorise
+    // l'affichage photo qui la précédait.
+    const persistedMode = photoMode === 'video' ? modeBeforeVideoRef.current : photoMode
+    persistLiveState(id, {
+      segmentIndex,
+      startedAt,
+      slideIndex,
+      blackout,
+      photoMode: persistedMode,
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveStateHydrated, id, segmentIndex, startedAt, slideIndex, blackout, photoMode])
 
@@ -367,11 +395,113 @@ export default function LiveMode() {
     sendProjectorStateRef.current = sendProjectorState
   })
 
+  // --- Vidéo : chargée à l'avance sur l'écran de projection, pilotée depuis la régie ---
+  const activeVideo = videos.find((v) => v.id === videoChoiceId) ?? null
+
+  function sendVideoToProjector(force = false) {
+    if (!channelRef.current) return
+    const key = `${activeVideo?.id ?? ''}|${videoSound}`
+    if (!force && key === lastSentVideoKeyRef.current) return
+    lastSentVideoKeyRef.current = key
+    channelRef.current.postMessage({
+      type: 'video',
+      video: activeVideo ? { id: activeVideo.id, blob: activeVideo.blob } : null,
+      withSound: videoSound === 'video',
+      volume: videoVolume,
+    } satisfies ProjectorMessage)
+  }
+  const sendVideoToProjectorRef = useRef(sendVideoToProjector)
+  useEffect(() => {
+    sendVideoToProjectorRef.current = sendVideoToProjector
+  })
+
+  useEffect(() => {
+    sendVideoToProjector()
+    if (videoStatus && videoStatus.videoId !== activeVideo?.id) setVideoStatus(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVideo?.id, videoSound])
+
+  useEffect(() => {
+    channelRef.current?.postMessage({ type: 'videoVolume', volume: videoVolume } satisfies ProjectorMessage)
+  }, [videoVolume])
+
+  const videoIsPlaying = Boolean(videoStatus?.playing && videoStatus.videoId === activeVideo?.id)
+
+  // À chaque étape, on prépare la vidéo qui lui est assignée — sans jamais interrompre
+  // une vidéo en cours de lecture, et sans la lancer : c'est la régie qui décide.
+  useEffect(() => {
+    if (videoIsPlaying) return
+    const seg = segments[segmentIndex]
+    if (seg?.videoId && videos.some((v) => v.id === seg.videoId)) {
+      setVideoChoiceId(seg.videoId)
+      setVideoSound(seg.videoSound ?? 'video')
+    } else if (!videoChoiceId && videos.length > 0) {
+      setVideoChoiceId(videos[0].id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segmentIndex, videos.length])
+
+  function sendVideoCmd(msg: { cmd: 'play' } | { cmd: 'pause' } | { cmd: 'seek'; time: number }) {
+    channelRef.current?.postMessage({ type: 'videoCmd', ...msg } satisfies ProjectorMessage)
+  }
+
+  function returnFromVideo() {
+    setPhotoMode((m) => (m === 'video' ? modeBeforeVideoRef.current : m))
+  }
+
+  function playVideo() {
+    if (!activeVideo) return
+    setPhotoMode((m) => {
+      if (m !== 'video') modeBeforeVideoRef.current = m
+      return 'video'
+    })
+    setBlackout(false)
+    setSlidesPlaying(false)
+    if (videoSound === 'video') {
+      // La bande-son de la vidéo prend le relais : la musique en cours s'efface en douceur.
+      if (isPlaying) fadeOut()
+    } else if (!isPlaying && activeTrackId) {
+      // Vidéo muette : la musique de l'étape l'accompagne.
+      if (audioRef.current?.src) togglePlay()
+      else loadAndPlayTrack(activeTrackId)
+    }
+    if (videoStatus?.ended) sendVideoCmd({ cmd: 'seek', time: 0 })
+    sendVideoCmd({ cmd: 'play' })
+  }
+
+  function pauseVideo() {
+    sendVideoCmd({ cmd: 'pause' })
+  }
+
+  function stopVideo() {
+    sendVideoCmd({ cmd: 'pause' })
+    sendVideoCmd({ cmd: 'seek', time: 0 })
+    returnFromVideo()
+  }
+
+  function toggleVideoPlaying() {
+    if (videoIsPlaying) pauseVideo()
+    else playVideo()
+  }
+
+  // Fin de la vidéo : retour automatique à l'affichage précédent (diaporama ou photo fixe).
+  useEffect(() => {
+    if (videoStatus?.ended) returnFromVideo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoStatus?.ended])
+
   useEffect(() => {
     if (!id) return
     const channel = new BroadcastChannel(channelNameFor(id))
     channel.onmessage = (ev: MessageEvent<ProjectorMessage>) => {
-      if (ev.data.type === 'ready') sendProjectorStateRef.current()
+      const msg = ev.data
+      if (msg.type === 'ready') {
+        sendProjectorStateRef.current()
+        sendVideoToProjectorRef.current(true)
+      } else if (msg.type === 'videoStatus') {
+        const { type: _type, ...status } = msg
+        setVideoStatus(status)
+      }
     }
     channelRef.current = channel
     return () => channel.close()
@@ -417,6 +547,10 @@ export default function LiveMode() {
     setSlidesPlaying((p) => !p)
   }
   function togglePhotoModeState() {
+    if (photoMode === 'video') {
+      stopVideo()
+      return
+    }
     setPhotoMode((m) => (m === 'diaporama' ? 'fixe' : 'diaporama'))
   }
   function toggleBlackoutState() {
@@ -441,6 +575,7 @@ export default function LiveMode() {
     toggleBlackout: toggleBlackoutState,
     toggleAutoScroll: toggleAutoScrollState,
     startChrono: startChronoIfNeeded,
+    toggleVideo: toggleVideoPlaying,
   }
 
   // Refs toujours à jour pour le gestionnaire clavier ci-dessous, qui n'est
@@ -582,6 +717,12 @@ export default function LiveMode() {
                     <div className="mt-0.5 flex items-center gap-1 text-xs text-muted">
                       <Icon name="music" className="h-3 w-3" />
                       Musique assignée
+                    </div>
+                  )}
+                  {seg.videoId && (
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+                      <Icon name="video" className="h-3 w-3" />
+                      Vidéo assignée
                     </div>
                   )}
                 </button>
@@ -906,6 +1047,123 @@ export default function LiveMode() {
               {blackout ? 'Rétablir la projection' : 'Écran noir'}
             </button>
           </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-xs uppercase tracking-wide text-muted">Vidéo</h2>
+              {photoMode === 'video' && (
+                <span className="rounded-full border border-sky-400 px-2 py-0.5 text-[10px] text-sky-400">
+                  À l'écran
+                </span>
+              )}
+            </div>
+
+            {videos.length === 0 ? (
+              <p className="text-xs text-muted">
+                Aucune vidéo pour cette cérémonie. Importez-la dans l'éditeur de la cérémonie
+                (ex. diaporama monté par la famille).
+              </p>
+            ) : (
+              <>
+                <select
+                  value={videoChoiceId}
+                  onChange={(e) => setVideoChoiceId(e.target.value)}
+                  disabled={videoIsPlaying}
+                  className="mb-2 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-xs text-fg outline-none focus:border-gold-dim disabled:opacity-60"
+                >
+                  {videos.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="mb-2 grid grid-cols-2 gap-1 rounded-md border border-line p-0.5 text-[11px]">
+                  {(
+                    [
+                      ['video', 'Son de la vidéo'],
+                      ['music', 'Musique de l’étape'],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      onClick={() => setVideoSound(value)}
+                      className={`rounded px-2 py-1 ${
+                        videoSound === value ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {activeVideo && (
+                  <VideoProgress
+                    status={videoStatus?.videoId === activeVideo.id ? videoStatus : null}
+                    fallbackDuration={activeVideo.duration}
+                    onSeek={(time) => sendVideoCmd({ cmd: 'seek', time })}
+                  />
+                )}
+
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    onClick={toggleVideoPlaying}
+                    disabled={!activeVideo}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-sky-400 px-2 py-1.5 text-xs font-medium text-sky-400 hover:bg-panel-2 disabled:opacity-40"
+                  >
+                    <Icon name="video" className="h-3.5 w-3.5" />
+                    {videoIsPlaying
+                      ? 'Pause vidéo'
+                      : photoMode === 'video' && videoStatus && videoStatus.currentTime > 0
+                        ? 'Reprendre la vidéo'
+                        : 'Lancer la vidéo'}
+                  </button>
+                  {photoMode === 'video' && (
+                    <button
+                      onClick={stopVideo}
+                      title="Arrête la vidéo et revient au diaporama ou à la photo fixe"
+                      className="rounded-md border border-line px-2 py-1.5 text-xs text-muted hover:text-fg"
+                    >
+                      Arrêter
+                    </button>
+                  )}
+                </div>
+
+                {videoSound === 'video' && (
+                  <label className="mt-2 flex items-center gap-2 text-[11px] text-muted">
+                    Volume
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={videoVolume}
+                      onChange={(e) => setVideoVolume(Number(e.target.value))}
+                      className="flex-1 accent-sky-400"
+                    />
+                  </label>
+                )}
+
+                {videoStatus?.blocked && (
+                  <p className="mt-2 rounded-md border border-danger px-2 py-1.5 text-[11px] text-danger">
+                    Le navigateur bloque le son sur l'écran de projection : cliquez une fois sur
+                    cette fenêtre (ou passez-la en plein écran), puis relancez.
+                  </p>
+                )}
+                {photoMode === 'video' && !videoStatus && (
+                  <p className="mt-2 text-[11px] text-muted">
+                    Ouvrez la projection pour diffuser la vidéo.
+                  </p>
+                )}
+                <p className="mt-2 text-[10px] text-muted">
+                  {videoSound === 'video'
+                    ? 'La musique en cours s’efface quand la vidéo démarre.'
+                    : 'Vidéo sans son, accompagnée par la musique de l’étape.'}{' '}
+                  À la fin, retour automatique au diaporama.
+                </p>
+              </>
+            )}
+          </div>
         </aside>
       </div>
 
@@ -930,4 +1188,35 @@ function PhotoPreview({ blob }: { blob: Blob }) {
   }, [blob])
   if (!url) return null
   return <img src={url} alt="" className="h-full w-full object-contain" />
+}
+
+function VideoProgress({
+  status,
+  fallbackDuration,
+  onSeek,
+}: {
+  status: VideoStatus | null
+  fallbackDuration?: number
+  onSeek: (time: number) => void
+}) {
+  const duration = status?.duration || fallbackDuration || 0
+  const current = status?.currentTime ?? 0
+  return (
+    <div>
+      <input
+        type="range"
+        min={0}
+        max={duration || 1}
+        step={0.5}
+        value={Math.min(current, duration || 1)}
+        disabled={!status || !duration}
+        onChange={(e) => onSeek(Number(e.target.value))}
+        className="w-full accent-sky-400 disabled:opacity-40"
+      />
+      <div className="flex justify-between font-mono text-[10px] text-muted">
+        <span>{formatClock(current)}</span>
+        <span>{duration ? `-${formatClock(Math.max(0, duration - current))}` : '--:--'}</span>
+      </div>
+    </div>
+  )
 }

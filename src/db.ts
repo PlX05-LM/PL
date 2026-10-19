@@ -1,11 +1,12 @@
 import Dexie, { type Table } from 'dexie'
-import type { Ceremony, Photo, Track } from './types'
+import type { Ceremony, Photo, Track, Video } from './types'
 import type { AccountRecord, LicenseRecord } from './lib/licensing/types'
 
 class CeremoniaDB extends Dexie {
   ceremonies!: Table<Ceremony, string>
   tracks!: Table<Track, string>
   photos!: Table<Photo, string>
+  videos!: Table<Video, string>
   license!: Table<LicenseRecord, string>
   accounts!: Table<AccountRecord, string>
 
@@ -23,6 +24,9 @@ class CeremoniaDB extends Dexie {
     this.version(3).stores({
       tracks: 'id, name, createdAt, ceremonyId',
       photos: 'id, name, createdAt, ceremonyId',
+    })
+    this.version(4).stores({
+      videos: 'id, name, createdAt, ceremonyId',
     })
   }
 }

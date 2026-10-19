@@ -19,6 +19,7 @@ export type IconName =
   | 'edit'
   | 'document'
   | 'arrow-left'
+  | 'video'
 
 interface IconProps {
   name: IconName
@@ -154,6 +155,12 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M14 3v5h5" />
       <line x1="8" y1="13" x2="16" y2="13" />
       <line x1="8" y1="17" x2="16" y2="17" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="3" y="6" width="13" height="12" rx="1.5" />
+      <path d="M16 10.5l5-3v9l-5-3" />
     </>
   ),
   'arrow-left': (

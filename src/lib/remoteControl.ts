@@ -10,6 +10,7 @@ export type RemoteAction =
   | 'toggleBlackout'
   | 'toggleAutoScroll'
   | 'startChrono'
+  | 'toggleVideo'
 
 export const actionOrder: RemoteAction[] = [
   'nextSegment',
@@ -23,6 +24,7 @@ export const actionOrder: RemoteAction[] = [
   'toggleBlackout',
   'toggleAutoScroll',
   'startChrono',
+  'toggleVideo',
 ]
 
 export const actionLabels: Record<RemoteAction, string> = {
@@ -37,6 +39,7 @@ export const actionLabels: Record<RemoteAction, string> = {
   toggleBlackout: "Écran noir (bascule)",
   toggleAutoScroll: 'Défilement auto du prompteur (bascule)',
   startChrono: 'Démarrer le chronomètre',
+  toggleVideo: 'Lecture / pause de la vidéo',
 }
 
 export type Keymap = Record<RemoteAction, string>
@@ -57,6 +60,7 @@ export const defaultKeymap: Keymap = {
   toggleBlackout: 'b',
   toggleAutoScroll: 'a',
   startChrono: 's',
+  toggleVideo: 'v',
 }
 
 const STORAGE_KEY = 'cerema-remote-keymap-v1'

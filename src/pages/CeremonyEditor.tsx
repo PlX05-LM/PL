@@ -13,8 +13,10 @@ import CitationLibraryModal from '../components/CitationLibraryModal'
 import AudioTrimModal from '../components/AudioTrimModal'
 import AIGenerateModal from '../components/AIGenerateModal'
 import BackButton from '../components/BackButton'
+import { describeVideoFormat, probeVideo } from '../lib/videoImport'
 import Icon from '../components/Icon'
 import type {
+  Video,
   Ceremony,
   CeremonySegment,
   CeremonyType,
@@ -49,6 +51,11 @@ export default function CeremonyEditor() {
   const ceremony = useLiveQuery(() => (id ? db.ceremonies.get(id) : undefined), [id])
   const allTracks = useLiveQuery(() => db.tracks.orderBy('name').toArray(), []) ?? []
   const allPhotos = useLiveQuery(() => db.photos.orderBy('createdAt').toArray(), []) ?? []
+  const videos =
+    useLiveQuery(
+      () => (id ? db.videos.where('ceremonyId').equals(id).sortBy('createdAt') : []),
+      [id],
+    ) ?? []
   const appSettings = useMemo(() => loadAppSettings(), [])
 
   // Une piste/photo importée n'appartient qu'à la cérémonie pour laquelle elle a été
@@ -219,6 +226,60 @@ export default function CeremonyEditor() {
     if (!confirm(`Supprimer "${photo.name}" ?`)) return
     if (draft?.slideshow.photoIds.includes(photo.id)) togglePhoto(photo.id)
     await db.photos.delete(photo.id)
+  }
+
+  const [importingVideos, setImportingVideos] = useState(false)
+  const [videoImportErrors, setVideoImportErrors] = useState<string[]>([])
+  const [previewVideo, setPreviewVideo] = useState<Video | null>(null)
+
+  async function handleImportVideos(files: FileList | null) {
+    if (!files || files.length === 0 || !draft) return
+    setImportingVideos(true)
+    setVideoImportErrors([])
+    const errors: string[] = []
+    let i = 0
+    for (const file of Array.from(files)) {
+      let probe
+      try {
+        probe = await probeVideo(file)
+      } catch {
+        errors.push(
+          `« ${file.name} » : format non lisible par ce navigateur. Exportez la vidéo en MP4 (H.264) et réimportez-la.`,
+        )
+        continue
+      }
+      const video: Video = {
+        id: newId(),
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        blob: file,
+        mimeType: file.type || 'video/mp4',
+        ...probe,
+        createdAt: Date.now() + i,
+        ceremonyId: draft.id,
+      }
+      try {
+        await db.videos.add(video)
+        i += 1
+      } catch {
+        errors.push(
+          `« ${file.name} » : enregistrement impossible, l'espace de stockage de cet appareil est probablement insuffisant.`,
+        )
+      }
+    }
+    setVideoImportErrors(errors)
+    setImportingVideos(false)
+  }
+
+  async function removeVideo(video: Video) {
+    if (!confirm(`Supprimer la vidéo "${video.name}" ?`)) return
+    if (draft?.segments.some((s) => s.videoId === video.id)) {
+      update({
+        segments: draft.segments.map((s) =>
+          s.videoId === video.id ? { ...s, videoId: undefined, videoSound: undefined } : s,
+        ),
+      })
+    }
+    await db.videos.delete(video.id)
   }
 
   const [importingTracks, setImportingTracks] = useState(false)
@@ -516,6 +577,66 @@ export default function CeremonyEditor() {
         )}
       </section>
 
+      <section className="mt-8 rounded-lg border border-line bg-panel p-5">
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <div>
+            <h3 className="font-display text-lg text-fg">Vidéos de cette cérémonie</h3>
+            <p className="mt-1 text-xs text-muted">
+              Diaporama monté par la famille, film souvenir… Projetée dans son format
+              d'origine, avec sa propre bande-son ou en muet sur la musique de l'étape. Assignez-la
+              à une étape du déroulé, puis lancez-la depuis la régie.
+            </p>
+          </div>
+          <label className="shrink-0 cursor-pointer whitespace-nowrap rounded-md border border-line px-3 py-2 text-xs text-muted hover:border-gold-dim hover:text-gold">
+            {importingVideos ? 'Vérification…' : '+ Importer des vidéos'}
+            <input
+              type="file"
+              accept="video/*,.mp4,.mov,.m4v,.webm"
+              multiple
+              className="hidden"
+              disabled={importingVideos}
+              onChange={(e) => {
+                handleImportVideos(e.target.files)
+                e.target.value = ''
+              }}
+            />
+          </label>
+        </div>
+        {videoImportErrors.length > 0 && (
+          <ul className="mb-3 space-y-1 rounded-md border border-danger px-3 py-2 text-xs text-danger">
+            {videoImportErrors.map((err) => (
+              <li key={err}>{err}</li>
+            ))}
+          </ul>
+        )}
+        {videos.length > 0 && (
+          <ul className="divide-y divide-line rounded-md border border-line bg-panel-2">
+            {videos.map((v) => (
+              <li key={v.id} className="flex items-center gap-3 px-3 py-2">
+                <button
+                  onClick={() => setPreviewVideo(v)}
+                  title="Visionner"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gold-dim text-xs text-gold hover:bg-panel"
+                >
+                  ▶
+                </button>
+                <span className="flex-1 truncate text-sm text-fg">{v.name}</span>
+                <span className="hidden text-xs text-muted sm:inline">
+                  {describeVideoFormat(v.width, v.height)}
+                </span>
+                <span className="text-xs text-muted">{formatDuration(v.duration)}</span>
+                <button
+                  onClick={() => removeVideo(v)}
+                  className="text-xs text-muted hover:text-danger"
+                >
+                  Supprimer
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="mt-8">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-display text-xl text-fg">Déroulé de la cérémonie</h3>
@@ -625,6 +746,39 @@ export default function CeremonyEditor() {
                       </button>
                     </div>
                   </div>
+                  {videos.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <Icon name="video" className="h-3.5 w-3.5 text-muted" />
+                      <select
+                        value={seg.videoId ?? ''}
+                        onChange={(e) =>
+                          updateSegment(seg.id, { videoId: e.target.value || undefined })
+                        }
+                        className="rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
+                      >
+                        <option value="">Aucune vidéo</option>
+                        {videos.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name}
+                          </option>
+                        ))}
+                      </select>
+                      {seg.videoId && (
+                        <select
+                          value={seg.videoSound ?? 'video'}
+                          onChange={(e) =>
+                            updateSegment(seg.id, {
+                              videoSound: e.target.value as 'video' | 'music',
+                            })
+                          }
+                          className="rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
+                        >
+                          <option value="video">Avec le son de la vidéo</option>
+                          <option value="music">Sans son, sur la musique de l'étape</option>
+                        </select>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -908,6 +1062,10 @@ export default function CeremonyEditor() {
         />
       )}
 
+      {previewVideo && (
+        <VideoPreviewModal video={previewVideo} onClose={() => setPreviewVideo(null)} />
+      )}
+
       {deletedSegment && (
         <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-gold-dim bg-panel px-4 py-3 shadow-lg">
           <span className="text-sm text-fg">
@@ -943,4 +1101,45 @@ function PhotoThumb({ blob }: { blob: Blob }) {
   }, [blob])
   if (!url) return null
   return <img src={url} alt="" className="h-full w-full object-cover" />
+}
+
+function VideoPreviewModal({ video, onClose }: { video: Video; onClose: () => void }) {
+  const [url, setUrl] = useState<string | null>(null)
+  useEffect(() => {
+    const u = URL.createObjectURL(video.blob)
+    setUrl(u)
+    return () => URL.revokeObjectURL(u)
+  }, [video.blob])
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-4xl rounded-lg border border-line bg-panel p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <h3 className="truncate font-display text-lg text-fg">{video.name}</h3>
+          <button onClick={onClose} className="text-sm text-muted hover:text-fg">
+            Fermer
+          </button>
+        </div>
+        {url && (
+          <video
+            src={url}
+            controls
+            autoPlay
+            playsInline
+            className="max-h-[70vh] w-full rounded-md bg-black object-contain"
+          />
+        )}
+      </div>
+    </div>
+  )
 }

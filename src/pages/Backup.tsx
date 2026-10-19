@@ -26,7 +26,7 @@ export default function Backup() {
       const result = await exportFullBackup()
       setMessage({
         kind: 'success',
-        text: `Sauvegarde téléchargée : ${result.ceremonies} cérémonie(s), ${result.tracks} musique(s), ${result.photos} photo(s).`,
+        text: `Sauvegarde téléchargée : ${result.ceremonies} cérémonie(s), ${result.tracks} musique(s), ${result.photos} photo(s), ${result.videos} vidéo(s).`,
       })
     } catch (err) {
       setMessage({ kind: 'error', text: `Échec de la sauvegarde : ${(err as Error).message}` })
@@ -52,7 +52,7 @@ export default function Backup() {
       const result = await importFullBackup(file)
       setMessage({
         kind: 'success',
-        text: `Sauvegarde restaurée : ${result.ceremonies} cérémonie(s), ${result.tracks} musique(s), ${result.photos} photo(s).`,
+        text: `Sauvegarde restaurée : ${result.ceremonies} cérémonie(s), ${result.tracks} musique(s), ${result.photos} photo(s), ${result.videos} vidéo(s).`,
       })
       await refreshStats()
     } catch (err) {
@@ -78,7 +78,8 @@ export default function Backup() {
         <p className="mt-4 text-sm text-muted">
           Actuellement sur cet appareil : <strong className="text-fg">{stats.ceremonies}</strong>{' '}
           cérémonie(s), <strong className="text-fg">{stats.tracks}</strong> musique(s),{' '}
-          <strong className="text-fg">{stats.photos}</strong> photo(s).
+          <strong className="text-fg">{stats.photos}</strong> photo(s),{' '}
+          <strong className="text-fg">{stats.videos}</strong> vidéo(s).
         </p>
       )}
 
