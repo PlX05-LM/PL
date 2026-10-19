@@ -11,12 +11,13 @@ import Projector from './pages/Projector'
 import Backup from './pages/Backup'
 import Settings from './pages/Settings'
 import PwaUpdatePrompt from './components/PwaUpdatePrompt'
-import { migrateMediaOwnership, removeNaturePhotoLibrary } from './lib/mediaOwnershipMigration'
+import { attachOrphanPhotos, migrateMediaOwnership, removeNaturePhotoLibrary } from './lib/mediaOwnershipMigration'
 
 export default function App() {
   useEffect(() => {
     migrateMediaOwnership()
-    removeNaturePhotoLibrary()
+      .then(removeNaturePhotoLibrary)
+      .then(attachOrphanPhotos)
   }, [])
 
   return (

@@ -73,9 +73,12 @@ export default function CeremonyEditor() {
 
   const [draft, setDraft] = useState<Ceremony | null>(null)
 
+  // Au changement de cérémonie (même écran réutilisé, ex. via le retour arrière), on
+  // repart d'un brouillon vide : jamais les données ni les photos de la précédente.
   useEffect(() => {
-    if (ceremony) setDraft(ceremony)
-  }, [ceremony?.id])
+    if (ceremony && ceremony.id === id) setDraft(ceremony)
+    else setDraft(null)
+  }, [ceremony?.id, id])
 
   // keep in sync if changed elsewhere but avoid clobbering active typing
   useEffect(() => {
@@ -324,7 +327,7 @@ export default function CeremonyEditor() {
     }
   }
 
-  if (!draft) {
+  if (!draft || draft.id !== id) {
     return <div className="p-10 text-muted">Chargement…</div>
   }
 

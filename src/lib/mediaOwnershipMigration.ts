@@ -78,3 +78,30 @@ export async function removeNaturePhotoLibrary(): Promise<void> {
 
   localStorage.setItem(NATURE_CLEANUP_FLAG_KEY, '1')
 }
+
+const ORPHAN_PHOTOS_FLAG_KEY = 'cerema-orphan-photos-attached-v1'
+
+/**
+ * Photos importées avant le cloisonnement et jamais sélectionnées : elles n'ont aucune
+ * cérémonie de rattachement. On les range dans la cérémonie pour laquelle elles ont
+ * été importées, c'est-à-dire la dernière cérémonie créée avant leur import (à défaut,
+ * la plus ancienne). Elles ne peuvent ainsi plus apparaître dans une autre cérémonie.
+ */
+export async function attachOrphanPhotos(): Promise<void> {
+  if (localStorage.getItem(ORPHAN_PHOTOS_FLAG_KEY)) return
+
+  const ceremonies = (await db.ceremonies.toArray()).sort((a, b) => a.createdAt - b.createdAt)
+  if (ceremonies.length === 0) return
+
+  const orphans = (await db.photos.toArray()).filter((p) => !p.ceremonyId)
+  for (const photo of orphans) {
+    let owner = ceremonies[0]
+    for (const c of ceremonies) {
+      if (c.createdAt <= photo.createdAt) owner = c
+      else break
+    }
+    await db.photos.update(photo.id, { ceremonyId: owner.id })
+  }
+
+  localStorage.setItem(ORPHAN_PHOTOS_FLAG_KEY, '1')
+}
