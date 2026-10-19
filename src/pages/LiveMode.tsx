@@ -105,6 +105,9 @@ export default function LiveMode() {
   const [elapsed, setElapsed] = useState(0)
 
   const [liveStateHydrated, setLiveStateHydrated] = useState(false)
+  // Après une reprise, on ne réapplique pas l'écran prévu pour l'étape : on garde ce
+  // qui était affiché au moment de la coupure.
+  const resumedFromStateRef = useRef(false)
   const [resumed, setResumed] = useState(false)
 
   const [keymap, setKeymap] = useState<Keymap>(() => loadKeymap())
@@ -148,10 +151,19 @@ export default function LiveMode() {
     return ceremony.slideshow.shuffle ? seededShuffle(ordered, ceremony.id) : ordered
   }, [ceremony, allPhotos])
 
+  // Photos de la cérémonie, toutes disponibles comme photo fixe (pas seulement celles
+  // retenues pour le diaporama).
+  const ceremonyPhotos = useMemo(
+    () => allPhotos.filter((p) => p.ceremonyId === id).sort((a, b) => a.createdAt - b.createdAt),
+    [allPhotos, id],
+  )
+
+  // Photo fixe choisie en direct ; à défaut, celle définie pour la cérémonie.
+  const [liveFixedPhotoId, setLiveFixedPhotoId] = useState<string | undefined>(undefined)
   const fixedPhoto = useMemo(() => {
-    const fixedPhotoId = ceremony?.slideshow.fixedPhotoId
+    const fixedPhotoId = liveFixedPhotoId ?? ceremony?.slideshow.fixedPhotoId
     return fixedPhotoId ? allPhotos.find((p) => p.id === fixedPhotoId) ?? null : null
-  }, [ceremony, allPhotos])
+  }, [liveFixedPhotoId, ceremony, allPhotos])
 
   // --- Reprise après rechargement/plantage : on restaure l'état une seule fois au chargement ---
   useEffect(() => {
@@ -163,7 +175,11 @@ export default function LiveMode() {
       setSlideIndex(ls.slideIndex)
       setBlackout(ls.blackout)
       setPhotoMode(ls.photoMode ?? 'diaporama')
-      if (ls.startedAt !== null) setResumed(true)
+      setLiveFixedPhotoId(ls.fixedPhotoId)
+      if (ls.startedAt !== null) {
+        setResumed(true)
+        resumedFromStateRef.current = true
+      }
     }
     setLiveStateHydrated(true)
   }, [ceremony, liveStateHydrated])
@@ -177,6 +193,7 @@ export default function LiveMode() {
         slideIndex: number
         blackout: boolean
         photoMode: 'diaporama' | 'fixe'
+        fixedPhotoId?: string
       },
     ) => {
       db.ceremonies.update(id, { liveState: state, updatedAt: Date.now() })
@@ -195,9 +212,10 @@ export default function LiveMode() {
       slideIndex,
       blackout,
       photoMode: persistedMode,
+      fixedPhotoId: liveFixedPhotoId,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveStateHydrated, id, segmentIndex, startedAt, slideIndex, blackout, photoMode])
+  }, [liveStateHydrated, id, segmentIndex, startedAt, slideIndex, blackout, photoMode, liveFixedPhotoId])
 
   // --- Elapsed time chrono ---
   useEffect(() => {
@@ -441,6 +459,51 @@ export default function LiveMode() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segmentIndex, videos.length])
 
+  // --- Écran prévu pour chaque étape (diaporama ou photo fixe), appliqué en y arrivant ---
+  const appliedSegmentRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!liveStateHydrated || !ceremony) return
+    if (appliedSegmentRef.current === segmentIndex) return
+    const isFirst = appliedSegmentRef.current === null
+    appliedSegmentRef.current = segmentIndex
+    if (isFirst && resumedFromStateRef.current) return
+    applySegmentScreen(segments[segmentIndex])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segmentIndex, liveStateHydrated, ceremony?.id])
+
+  function applySegmentScreen(seg: (typeof segments)[number] | undefined) {
+    if (!seg?.screen) return
+    if (seg.screen === 'fixe' && seg.fixedPhotoId) setLiveFixedPhotoId(seg.fixedPhotoId)
+    // Une vidéo en cours n'est jamais coupée par un changement d'étape.
+    if (photoMode === 'video') return
+    if (seg.screen === 'fixe') {
+      if (seg.fixedPhotoId || ceremony?.slideshow.fixedPhotoId || liveFixedPhotoId) {
+        setPhotoMode('fixe')
+      }
+    } else {
+      setPhotoMode('diaporama')
+    }
+  }
+
+  function leaveVideoIfShown() {
+    if (photoMode !== 'video') return
+    sendVideoCmd({ cmd: 'pause' })
+    sendVideoCmd({ cmd: 'seek', time: 0 })
+  }
+
+  function showSlideshow() {
+    leaveVideoIfShown()
+    setBlackout(false)
+    setPhotoMode('diaporama')
+  }
+
+  function showFixedPhoto(photoId?: string) {
+    if (photoId) setLiveFixedPhotoId(photoId)
+    leaveVideoIfShown()
+    setBlackout(false)
+    setPhotoMode('fixe')
+  }
+
   function sendVideoCmd(msg: { cmd: 'play' } | { cmd: 'pause' } | { cmd: 'seek'; time: number }) {
     channelRef.current?.postMessage({ type: 'videoCmd', ...msg } satisfies ProjectorMessage)
   }
@@ -551,6 +614,7 @@ export default function LiveMode() {
       stopVideo()
       return
     }
+    if (photoMode === 'diaporama' && !fixedPhoto) return
     setPhotoMode((m) => (m === 'diaporama' ? 'fixe' : 'diaporama'))
   }
   function toggleBlackoutState() {
@@ -723,6 +787,12 @@ export default function LiveMode() {
                     <div className="mt-0.5 flex items-center gap-1 text-xs text-muted">
                       <Icon name="video" className="h-3 w-3" />
                       Vidéo assignée
+                    </div>
+                  )}
+                  {seg.screen && (
+                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+                      <Icon name={seg.screen === 'fixe' ? 'pin' : 'film'} className="h-3 w-3" />
+                      {seg.screen === 'fixe' ? 'Photo fixe' : 'Diaporama'}
                     </div>
                   )}
                 </button>
@@ -973,48 +1043,34 @@ export default function LiveMode() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-xs uppercase tracking-wide text-muted">Diaporama</h2>
-              <span className="text-xs text-muted">
+              <span className="flex items-center gap-2 text-xs text-muted">
+                {photoMode === 'diaporama' && (
+                  <span className="rounded-full border border-gold px-2 py-0.5 text-[10px] text-gold">
+                    À l'écran
+                  </span>
+                )}
                 {slidePhotos.length > 0 ? `${slideIndex + 1}/${slidePhotos.length}` : '0/0'}
               </span>
             </div>
 
-            <button
-              onClick={togglePhotoModeState}
-              disabled={photoMode === 'diaporama' && !fixedPhoto}
-              title={
-                photoMode === 'diaporama' && !fixedPhoto
-                  ? "Aucune photo fixe définie pour cette cérémonie (à marquer dans l'éditeur de cérémonie)"
-                  : undefined
-              }
-              className={`mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
-                photoMode === 'fixe'
-                  ? 'border-sky-400 text-sky-400 hover:bg-panel-2'
-                  : 'border-line text-muted hover:text-fg'
-              }`}
-            >
-              {photoMode === 'fixe' ? (
-                <>
-                  <Icon name="film" className="h-3.5 w-3.5" />
-                  Rebasculer sur le diaporama
-                </>
-              ) : (
-                <>
-                  <Icon name="pin" className="h-3.5 w-3.5" />
-                  Afficher la photo fixe
-                </>
-              )}
-            </button>
+            {photoMode !== 'diaporama' && (
+              <button
+                onClick={showSlideshow}
+                className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-gold-dim px-2 py-1.5 text-xs font-medium text-gold hover:bg-panel-2"
+              >
+                <Icon name="film" className="h-3.5 w-3.5" />
+                Revenir au diaporama
+              </button>
+            )}
 
-            {photoMode === 'fixe' ? (
-              <div className="mb-2 aspect-video overflow-hidden rounded-md border border-sky-400 bg-black">
-                {fixedPhoto && <PhotoPreview blob={fixedPhoto.blob} />}
+            {slidePhotos[slideIndex] && (
+              <div
+                className={`mb-2 aspect-video overflow-hidden rounded-md border bg-black ${
+                  photoMode === 'diaporama' ? 'border-gold' : 'border-line opacity-60'
+                }`}
+              >
+                <PhotoPreview blob={slidePhotos[slideIndex].blob} />
               </div>
-            ) : (
-              slidePhotos[slideIndex] && (
-                <div className="mb-2 aspect-video overflow-hidden rounded-md border border-line bg-black">
-                  <PhotoPreview blob={slidePhotos[slideIndex].blob} />
-                </div>
-              )
             )}
             <div className="flex items-center gap-2">
               <button
@@ -1036,6 +1092,96 @@ export default function LiveMode() {
                 ⏭
               </button>
             </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-xs uppercase tracking-wide text-muted">Photo fixe</h2>
+              {photoMode === 'fixe' && (
+                <span className="rounded-full border border-sky-400 px-2 py-0.5 text-[10px] text-sky-400">
+                  À l'écran
+                </span>
+              )}
+            </div>
+
+            {ceremonyPhotos.length === 0 ? (
+              <p className="text-xs text-muted">
+                Aucune photo importée pour cette cérémonie.
+              </p>
+            ) : (
+              <>
+                <div
+                  className={`mb-2 aspect-video overflow-hidden rounded-md border bg-black ${
+                    photoMode === 'fixe' ? 'border-sky-400' : 'border-line'
+                  }`}
+                >
+                  {fixedPhoto ? (
+                    <PhotoPreview blob={fixedPhoto.blob} />
+                  ) : (
+                    <p className="flex h-full items-center justify-center px-3 text-center text-[11px] text-muted">
+                      Choisissez une photo ci-dessous
+                    </p>
+                  )}
+                </div>
+
+                {currentSegment?.screen === 'fixe' && currentSegment.fixedPhotoId && (
+                  <p className="mb-1 text-[10px] text-muted">
+                    Photo prévue pour l'étape « {currentSegment.title} » :{' '}
+                    {currentSegment.fixedPhotoId === fixedPhoto?.id ? 'sélectionnée' : (
+                      <button
+                        onClick={() => setLiveFixedPhotoId(currentSegment.fixedPhotoId)}
+                        className="text-sky-400 underline"
+                      >
+                        la reprendre
+                      </button>
+                    )}
+                  </p>
+                )}
+
+                <div className="mb-2 grid max-h-40 grid-cols-4 gap-1 overflow-y-auto">
+                  {ceremonyPhotos.map((p) => {
+                    const isCurrent = fixedPhoto?.id === p.id
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => (photoMode === 'fixe' ? showFixedPhoto(p.id) : setLiveFixedPhotoId(p.id))}
+                        title={
+                          photoMode === 'fixe'
+                            ? 'Afficher cette photo à l’écran'
+                            : 'Choisir comme photo fixe (sans l’afficher)'
+                        }
+                        className={`aspect-square overflow-hidden rounded border-2 ${
+                          isCurrent ? 'border-sky-400' : 'border-transparent hover:border-line'
+                        }`}
+                      >
+                        <PhotoPreview blob={p.blob} cover />
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <button
+                  onClick={() => (photoMode === 'fixe' ? showSlideshow() : showFixedPhoto())}
+                  disabled={photoMode !== 'fixe' && !fixedPhoto}
+                  className={`flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
+                    photoMode === 'fixe'
+                      ? 'border-line text-muted hover:text-fg'
+                      : 'border-sky-400 text-sky-400 hover:bg-panel-2'
+                  }`}
+                >
+                  <Icon name="pin" className="h-3.5 w-3.5" />
+                  {photoMode === 'fixe' ? 'Masquer la photo fixe' : 'Afficher la photo fixe'}
+                </button>
+                <p className="mt-1 text-[10px] text-muted">
+                  {photoMode === 'fixe'
+                    ? 'Touchez une vignette pour changer la photo à l’écran.'
+                    : 'Touchez une vignette pour la préparer, puis affichez-la.'}
+                </p>
+              </>
+            )}
+          </div>
+
+          <div>
             <button
               onClick={toggleBlackoutState}
               className={`mt-2 w-full rounded-md border px-2 py-1 text-xs ${
@@ -1179,7 +1325,7 @@ export default function LiveMode() {
   )
 }
 
-function PhotoPreview({ blob }: { blob: Blob }) {
+function PhotoPreview({ blob, cover = false }: { blob: Blob; cover?: boolean }) {
   const [url, setUrl] = useState<string | null>(null)
   useEffect(() => {
     const u = URL.createObjectURL(blob)
@@ -1187,7 +1333,9 @@ function PhotoPreview({ blob }: { blob: Blob }) {
     return () => URL.revokeObjectURL(u)
   }, [blob])
   if (!url) return null
-  return <img src={url} alt="" className="h-full w-full object-contain" />
+  return (
+    <img src={url} alt="" className={`h-full w-full ${cover ? 'object-cover' : 'object-contain'}`} />
+  )
 }
 
 function VideoProgress({

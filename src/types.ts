@@ -88,6 +88,13 @@ export interface CeremonySegment {
   videoId?: string
   /** Par défaut, le son de la vidéo. */
   videoSound?: VideoSound
+  /**
+   * Ce que montre l'écran de projection en arrivant sur cette étape. Absent : l'écran ne
+   * change pas.
+   */
+  screen?: 'diaporama' | 'fixe'
+  /** Photo fixe propre à cette étape (sinon, la photo fixe de la cérémonie). */
+  fixedPhotoId?: string
 }
 
 export type CeremonyType = 'obseques' | 'creation' | 'inhumation' | 'hommage' | 'autre'
@@ -144,6 +151,8 @@ export interface LiveState {
   slideIndex: number
   blackout: boolean
   photoMode: 'diaporama' | 'fixe'
+  /** Photo fixe choisie en direct depuis la régie. */
+  fixedPhotoId?: string
 }
 
 export interface Ceremony {

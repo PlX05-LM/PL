@@ -224,13 +224,28 @@ export default function CeremonyEditor() {
 
   async function removePhoto(photo: Photo) {
     if (!confirm(`Supprimer "${photo.name}" ?`)) return
-    if (draft?.slideshow.photoIds.includes(photo.id)) togglePhoto(photo.id)
+    if (draft) {
+      const inSlideshow = draft.slideshow.photoIds.includes(photo.id)
+      const inSegments = draft.segments.some((s) => s.fixedPhotoId === photo.id)
+      if (inSlideshow || inSegments) {
+        update({
+          slideshow: {
+            ...draft.slideshow,
+            photoIds: draft.slideshow.photoIds.filter((p) => p !== photo.id),
+          },
+          segments: draft.segments.map((s) =>
+            s.fixedPhotoId === photo.id ? { ...s, fixedPhotoId: undefined } : s,
+          ),
+        })
+      }
+    }
     await db.photos.delete(photo.id)
   }
 
   const [importingVideos, setImportingVideos] = useState(false)
   const [videoImportErrors, setVideoImportErrors] = useState<string[]>([])
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null)
+  const [fixedPhotoPickerFor, setFixedPhotoPickerFor] = useState<string | null>(null)
 
   async function handleImportVideos(files: FileList | null) {
     if (!files || files.length === 0 || !draft) return
@@ -746,6 +761,54 @@ export default function CeremonyEditor() {
                       </button>
                     </div>
                   </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <Icon name="monitor" className="h-3.5 w-3.5 text-muted" />
+                    <select
+                      value={seg.screen ?? ''}
+                      onChange={(e) =>
+                        updateSegment(seg.id, {
+                          screen: (e.target.value || undefined) as CeremonySegment['screen'],
+                        })
+                      }
+                      title="Ce que montre l'écran de projection en arrivant sur cette étape"
+                      className="rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
+                    >
+                      <option value="">Écran inchangé</option>
+                      <option value="diaporama">Diaporama</option>
+                      <option value="fixe">Photo fixe</option>
+                    </select>
+                    {seg.screen === 'fixe' && (
+                      <button
+                        onClick={() => setFixedPhotoPickerFor(seg.id)}
+                        disabled={photos.length === 0}
+                        title={
+                          photos.length === 0
+                            ? 'Importez d’abord des photos dans la section Diaporama photo'
+                            : 'Choisir la photo de cette étape'
+                        }
+                        className="flex items-center gap-2 rounded-md border border-line px-2 py-1 text-xs text-muted hover:border-sky-400 hover:text-fg disabled:opacity-40"
+                      >
+                        {(() => {
+                          const p = photos.find((ph) => ph.id === seg.fixedPhotoId)
+                          return p ? (
+                            <>
+                              <span className="h-6 w-6 overflow-hidden rounded">
+                                <PhotoThumb blob={p.blob} />
+                              </span>
+                              Changer la photo
+                            </>
+                          ) : (
+                            <>
+                              <Icon name="pin" className="h-3.5 w-3.5" />
+                              {draft.slideshow.fixedPhotoId
+                                ? 'Photo fixe de la cérémonie (choisir une autre)'
+                                : 'Choisir la photo'}
+                            </>
+                          )
+                        })()}
+                      </button>
+                    )}
+                  </div>
                   {videos.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <Icon name="video" className="h-3.5 w-3.5 text-muted" />
@@ -1062,6 +1125,18 @@ export default function CeremonyEditor() {
         />
       )}
 
+      {fixedPhotoPickerFor && (
+        <FixedPhotoPickerModal
+          photos={photos}
+          selectedId={draft.segments.find((s) => s.id === fixedPhotoPickerFor)?.fixedPhotoId}
+          onPick={(photoId) => {
+            updateSegment(fixedPhotoPickerFor, { fixedPhotoId: photoId })
+            setFixedPhotoPickerFor(null)
+          }}
+          onClose={() => setFixedPhotoPickerFor(null)}
+        />
+      )}
+
       {previewVideo && (
         <VideoPreviewModal video={previewVideo} onClose={() => setPreviewVideo(null)} />
       )}
@@ -1138,6 +1213,63 @@ function VideoPreviewModal({ video, onClose }: { video: Video; onClose: () => vo
             playsInline
             className="max-h-[70vh] w-full rounded-md bg-black object-contain"
           />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FixedPhotoPickerModal({
+  photos,
+  selectedId,
+  onPick,
+  onClose,
+}: {
+  photos: Photo[]
+  selectedId?: string
+  onPick: (photoId: string | undefined) => void
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg border border-line bg-panel p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between gap-4">
+          <h3 className="font-display text-lg text-fg">Photo fixe de cette étape</h3>
+          <button onClick={onClose} className="text-sm text-muted hover:text-fg">
+            Fermer
+          </button>
+        </div>
+        <div className="grid grid-cols-5 gap-2 overflow-y-auto">
+          {photos.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onPick(p.id)}
+              className={`aspect-square overflow-hidden rounded-md border-2 ${
+                p.id === selectedId ? 'border-sky-400' : 'border-transparent hover:border-line'
+              }`}
+            >
+              <PhotoThumb blob={p.blob} />
+            </button>
+          ))}
+        </div>
+        {selectedId && (
+          <button
+            onClick={() => onPick(undefined)}
+            className="mt-3 self-start text-xs text-muted hover:text-fg"
+          >
+            Utiliser la photo fixe de la cérémonie
+          </button>
         )}
       </div>
     </div>
