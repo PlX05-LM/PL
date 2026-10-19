@@ -5,6 +5,7 @@ import { formatDuration } from '../lib/audioDuration'
 import { isBuiltInTrackId } from '../lib/appSettings'
 import type { BuiltInLibraryProgress } from '../lib/royaltyFreeMusic'
 import AudioTrimModal from '../components/AudioTrimModal'
+import BackButton from '../components/BackButton'
 import Icon from '../components/Icon'
 import type { Track } from '../types'
 
@@ -62,6 +63,7 @@ export default function MusicLibrary() {
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-10">
+      <BackButton fallback="/" className="mb-6" />
       <div className="mb-8">
         <h2 className="font-display text-3xl text-fg">Musique libre de droit</h2>
         <p className="mt-1 text-sm text-muted">

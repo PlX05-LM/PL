@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { BackupStats } from '../lib/backup'
+import BackButton from '../components/BackButton'
 
 export default function Backup() {
   const fileInput = useRef<HTMLInputElement>(null)
@@ -64,6 +65,7 @@ export default function Backup() {
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-10">
+      <BackButton fallback="/" className="mb-6" />
       <h2 className="font-display text-3xl text-fg">Sauvegarde</h2>
       <p className="mt-1 text-sm text-muted">
         Toutes vos données (cérémonies, musiques, photos) sont stockées uniquement sur cet

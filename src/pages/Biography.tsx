@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { newId } from '../lib/ids'
@@ -7,6 +7,7 @@ import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { composeBiographyDraft, hasAnyBiographyContent } from '../lib/biographyComposer'
 import { AiGenerationError, generateBiographyDraftAI, isAiConfigured } from '../lib/aiGeneration'
 import { createEmptyBiography, type Biography, type BiographyChild } from '../types'
+import BackButton from '../components/BackButton'
 import Icon from '../components/Icon'
 
 const inputClass =
@@ -24,7 +25,6 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 export default function Biography() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const ceremony = useLiveQuery(() => (id ? db.ceremonies.get(id) : undefined), [id])
 
   const [bio, setBio] = useState<Biography | null>(null)
@@ -150,12 +150,7 @@ export default function Biography() {
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-8 pb-24">
-      <button
-        onClick={() => navigate(`/ceremonies/${ceremony.id}`)}
-        className="mb-6 text-sm text-muted hover:text-fg"
-      >
-        ← Retour à la cérémonie
-      </button>
+      <BackButton fallback={`/ceremonies/${ceremony.id}`} className="mb-6" />
 
       <h2 className="font-display text-3xl text-fg">Biographie</h2>
       <p className="mt-1 text-sm text-muted">

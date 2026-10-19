@@ -18,6 +18,7 @@ export type IconName =
   | 'user'
   | 'edit'
   | 'document'
+  | 'arrow-left'
 
 interface IconProps {
   name: IconName
@@ -153,6 +154,12 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M14 3v5h5" />
       <line x1="8" y1="13" x2="16" y2="13" />
       <line x1="8" y1="17" x2="16" y2="17" />
+    </>
+  ),
+  'arrow-left': (
+    <>
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <path d="M11 6l-6 6 6 6" />
     </>
   ),
 }

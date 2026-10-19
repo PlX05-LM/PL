@@ -3,6 +3,7 @@ import { changePassword, getLicense, listAccounts, loadSession } from '../lib/li
 import type { AccountRecord, LicenseRecord } from '../lib/licensing/types'
 import { loadAppSettings, saveAppSettings, type AppSettings } from '../lib/appSettings'
 import { generateSegmentTextAI } from '../lib/aiGeneration'
+import BackButton from '../components/BackButton'
 import Icon from '../components/Icon'
 
 const inputClass =
@@ -80,6 +81,7 @@ export default function Settings() {
 
   return (
     <div className="mx-auto max-w-2xl p-8">
+      <BackButton fallback="/" className="mb-6" />
       <h2 className="mb-6 font-display text-3xl text-fg">Paramètres</h2>
 
       <section className="mb-6 rounded-lg border border-line bg-panel p-5">

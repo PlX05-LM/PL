@@ -12,6 +12,7 @@ import PoemLibraryModal from '../components/PoemLibraryModal'
 import CitationLibraryModal from '../components/CitationLibraryModal'
 import AudioTrimModal from '../components/AudioTrimModal'
 import AIGenerateModal from '../components/AIGenerateModal'
+import BackButton from '../components/BackButton'
 import Icon from '../components/Icon'
 import type {
   Ceremony,
@@ -330,9 +331,7 @@ export default function CeremonyEditor() {
   return (
     <div className="mx-auto max-w-4xl px-8 py-8 pb-24">
       <div className="mb-6 flex items-center justify-between">
-        <button onClick={() => navigate('/')} className="text-sm text-muted hover:text-fg">
-          ← Retour aux cérémonies
-        </button>
+        <BackButton fallback="/" />
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate(`/ceremonies/${draft.id}/biographie`)}
