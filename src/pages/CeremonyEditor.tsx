@@ -13,7 +13,14 @@ import CitationLibraryModal from '../components/CitationLibraryModal'
 import AudioTrimModal from '../components/AudioTrimModal'
 import AIGenerateModal from '../components/AIGenerateModal'
 import BackButton from '../components/BackButton'
-import { describeVideoFormat, probeVideo } from '../lib/videoImport'
+import {
+  describeVideoFormat,
+  mimeTypeForVideo,
+  probeVideo,
+  VIDEO_ACCEPT,
+  type VideoProbe,
+} from '../lib/videoImport'
+import { convertToPlayableMp4, VideoConvertError, type ConvertProgress } from '../lib/videoConvert'
 import Icon from '../components/Icon'
 import type {
   Video,
@@ -247,27 +254,59 @@ export default function CeremonyEditor() {
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null)
   const [fixedPhotoPickerFor, setFixedPhotoPickerFor] = useState<string | null>(null)
 
+  const [videoConvertStatus, setVideoConvertStatus] = useState<string | null>(null)
+
   async function handleImportVideos(files: FileList | null) {
     if (!files || files.length === 0 || !draft) return
     setImportingVideos(true)
     setVideoImportErrors([])
     const errors: string[] = []
     let i = 0
-    for (const file of Array.from(files)) {
-      let probe
+    for (const original of Array.from(files)) {
+      let file: File = original
+      let probe: VideoProbe | undefined
       try {
-        probe = await probeVideo(file)
+        probe = await probeVideo(original)
       } catch {
-        errors.push(
-          `« ${file.name} » : format non lisible par ce navigateur. Exportez la vidéo en MP4 (H.264) et réimportez-la.`,
-        )
-        continue
+        probe = undefined
+      }
+      // Les MKV, AVI… sont toujours convertis en MP4 : même si ce navigateur sait les lire,
+      // un iPad ou un autre poste de la salle n'y arrivera pas forcément le jour J.
+      const needsConversion = !probe || !/\.(mp4|m4v|mov|webm)$/i.test(original.name)
+      if (needsConversion) {
+        const describe = (p: ConvertProgress) => {
+          const pct = p.progress !== undefined ? ` ${Math.round(p.progress * 100)} %` : ''
+          const label =
+            p.stage === 'loading'
+              ? 'Préparation du convertisseur…'
+              : p.stage === 'remux'
+                ? 'Conversion en MP4…'
+                : 'Conversion complète en MP4 (peut prendre plusieurs minutes)…'
+          setVideoConvertStatus(`« ${original.name} » — ${label}${pct}`)
+        }
+        try {
+          const converted = await convertToPlayableMp4(original, describe)
+          file = converted.file
+          probe = converted.probe
+        } catch (e) {
+          if (!probe) {
+            errors.push(
+              e instanceof VideoConvertError && e.reason === 'offline'
+                ? `« ${original.name} » : ce format doit être converti en MP4, ce qui nécessite une connexion internet la première fois. Reconnectez-vous puis réimportez la vidéo.`
+                : `« ${original.name} » : conversion impossible, le fichier semble endommagé ou dans un format inconnu.`,
+            )
+            continue
+          }
+          // Conversion impossible mais lisible ici : on garde l'original plutôt que de bloquer.
+        } finally {
+          setVideoConvertStatus(null)
+        }
       }
       const video: Video = {
         id: newId(),
-        name: file.name.replace(/\.[^/.]+$/, ''),
+        name: original.name.replace(/\.[^/.]+$/, ''),
         blob: file,
-        mimeType: file.type || 'video/mp4',
+        mimeType: mimeTypeForVideo(file),
         ...probe,
         createdAt: Date.now() + i,
         ceremonyId: draft.id,
@@ -277,7 +316,7 @@ export default function CeremonyEditor() {
         i += 1
       } catch {
         errors.push(
-          `« ${file.name} » : enregistrement impossible, l'espace de stockage de cet appareil est probablement insuffisant.`,
+          `« ${original.name} » : enregistrement impossible, l'espace de stockage de cet appareil est probablement insuffisant.`,
         )
       }
     }
@@ -606,7 +645,7 @@ export default function CeremonyEditor() {
             {importingVideos ? 'Vérification…' : '+ Importer des vidéos'}
             <input
               type="file"
-              accept="video/*,.mp4,.mov,.m4v,.webm"
+              accept={VIDEO_ACCEPT}
               multiple
               className="hidden"
               disabled={importingVideos}
@@ -617,6 +656,11 @@ export default function CeremonyEditor() {
             />
           </label>
         </div>
+        {videoConvertStatus && (
+          <p className="mb-3 rounded-md border border-gold-dim px-3 py-2 text-xs text-gold">
+            {videoConvertStatus}
+          </p>
+        )}
         {videoImportErrors.length > 0 && (
           <ul className="mb-3 space-y-1 rounded-md border border-danger px-3 py-2 text-xs text-danger">
             {videoImportErrors.map((err) => (

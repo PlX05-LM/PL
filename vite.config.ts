@@ -9,6 +9,8 @@ const base = process.env.GITHUB_PAGES ? '/PL/' : '/'
 // https://vite.dev/config/
 export default defineConfig({
   base,
+  // Le worker de conversion vidéo charge le moteur FFmpeg par import() dynamique.
+  worker: { format: 'es' },
   plugins: [
     react(),
     tailwindcss(),
@@ -40,6 +42,19 @@ export default defineConfig({
         // seule la coquille de l'application (JS/CSS/HTML/icônes) est mise en cache ici.
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
         navigateFallback: `${base}index.html`,
+        // Moteur de conversion vidéo (MKV, AVI… → MP4) : téléchargé au premier import qui en a
+        // besoin, puis conservé pour que les conversions suivantes marchent aussi hors-ligne.
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/@ffmpeg\/core@/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ffmpeg-core',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 4 },
+            },
+          },
+        ],
       },
     }),
   ],

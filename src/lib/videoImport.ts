@@ -45,6 +45,27 @@ const extensionByMime: Record<string, string> = {
   'video/webm': 'webm',
   'video/x-m4v': 'm4v',
   'video/ogg': 'ogv',
+  'video/x-matroska': 'mkv',
+}
+
+/** Formats souvent absents de `video/*` (macOS, iPad) : listés explicitement pour le sélecteur. */
+export const VIDEO_ACCEPT =
+  'video/*,.mp4,.mov,.m4v,.webm,.mkv,.avi,.wmv,.flv,.mts,.m2ts,.ts,.3gp,.mpg,.mpeg,.ogv'
+
+const mimeByExtension: Record<string, string> = {
+  mp4: 'video/mp4',
+  m4v: 'video/x-m4v',
+  mov: 'video/quicktime',
+  webm: 'video/webm',
+  mkv: 'video/x-matroska',
+  ogv: 'video/ogg',
+}
+
+/** Type MIME fiable même quand le système n'en fournit pas (cas fréquent des .mkv). */
+export function mimeTypeForVideo(file: File): string {
+  if (file.type) return file.type
+  const ext = file.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? ''
+  return mimeByExtension[ext] ?? 'video/mp4'
 }
 
 export function extensionForVideo(mimeType: string, originalName?: string): string {
