@@ -1,10 +1,10 @@
-import type { Ceremony, Track } from '../types'
+import { segmentTrackIds, type Ceremony, type Track } from '../types'
 
 /** Musiques utilisées par la cérémonie, dans l'ordre du déroulé. */
 export function collectCeremonyTracks(ceremony: Ceremony, tracks: Track[]): Track[] {
   const byId = new Map(tracks.map((t) => [t.id, t]))
   const orderedIds = [
-    ...ceremony.segments.map((s) => s.trackId),
+    ...ceremony.segments.flatMap(segmentTrackIds),
     ceremony.slideshow.trackId,
   ].filter((id): id is string => !!id)
 

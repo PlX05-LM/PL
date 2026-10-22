@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf'
 import { autoTable } from 'jspdf-autotable'
-import type { Ceremony, Track } from '../types'
+import { segmentTrackIds, type Ceremony, type Track } from '../types'
 import { toSafeFilename } from './filename'
 
 const typeLabels: Record<Ceremony['ceremonyType'], string> = {
@@ -85,7 +85,7 @@ export function exportCeremonyPdf(ceremony: Ceremony, tracks: Track[]) {
       String(i + 1),
       seg.title,
       `${seg.estimatedDuration} min`,
-      seg.trackId ? trackName(seg.trackId) : '—',
+      segmentTrackIds(seg).map((t) => trackName(t)).join('\n') || '—',
     ]),
     foot: [['', 'Durée totale estimée', `${totalMinutes} min`, '']],
     headStyles: { fillColor: [23, 26, 33], textColor: [201, 162, 75] },

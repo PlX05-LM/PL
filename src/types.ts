@@ -82,7 +82,10 @@ export interface CeremonySegment {
   title: string
   script: string
   estimatedDuration: number // minutes
+  /** Ancienne musique unique de l'étape — lue pour compatibilité, remplacée par `trackIds`. */
   trackId?: string
+  /** Musiques de l'étape, enchaînées dans cet ordre en régie. */
+  trackIds?: string[]
   notes?: string
   /** Vidéo à projeter pendant cette étape (lancée depuis la régie, jamais automatiquement). */
   videoId?: string
@@ -203,6 +206,12 @@ export function createEmptyCeremony(id: string): Ceremony {
     createdAt: now,
     updatedAt: now,
   }
+}
+
+/** Musiques de l'étape, dans l'ordre (compatible avec les cérémonies à musique unique). */
+export function segmentTrackIds(seg: Pick<CeremonySegment, 'trackId' | 'trackIds'>): string[] {
+  if (seg.trackIds) return seg.trackIds
+  return seg.trackId ? [seg.trackId] : []
 }
 
 export function createEmptySegment(id: string, order: number): CeremonySegment {

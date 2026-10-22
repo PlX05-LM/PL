@@ -8,7 +8,7 @@ import {
   type ProjectorMessage,
   type VideoStatus,
 } from '../lib/projectorChannel'
-import type { VideoSound } from '../types'
+import { segmentTrackIds, type VideoSound } from '../types'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { resolveAudioDuration } from '../lib/audioDuration'
 import { computePace, paceLabel } from '../lib/pace'
@@ -54,6 +54,26 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
   return arr
 }
 
+type RepeatMode = 'off' | 'all' | 'one'
+const REPEAT_KEY = 'cerema-music-repeat-v1'
+
+function loadRepeatMode(): RepeatMode {
+  try {
+    const v = localStorage.getItem(REPEAT_KEY)
+    return v === 'all' || v === 'one' ? v : 'off'
+  } catch {
+    return 'off'
+  }
+}
+
+function saveRepeatMode(mode: RepeatMode) {
+  try {
+    localStorage.setItem(REPEAT_KEY, mode)
+  } catch {
+    // préférence simplement non retenue (navigation privée…)
+  }
+}
+
 function formatClock(sec: number) {
   if (!Number.isFinite(sec)) return '--:--'
   const m = Math.floor(sec / 60)
@@ -91,6 +111,11 @@ export default function LiveMode() {
   // Piste réellement chargée dans le lecteur (peut différer de celle affichée).
   const loadedTrackIdRef = useRef<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
+  /** Répétition : aucune, le morceau en cours, ou toute la liste de l'étape. */
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>(loadRepeatMode)
+  /** Liste en cours de lecture (celle de l'étape au moment du lancement). */
+  const queueRef = useRef<string[]>([])
+  const fadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const audioOutputCapability = useMemo(() => detectAudioOutputCapability(), [])
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([])
@@ -341,8 +366,14 @@ export default function LiveMode() {
   }, [segmentIndex])
 
   // --- Audio player ---
-  const activeTrackId = manualTrackId || currentSegment?.trackId || ''
+  const stepTrackIds = useMemo(
+    () => (currentSegment ? segmentTrackIds(currentSegment).filter((tid) => tracks.some((t) => t.id === tid)) : []),
+    [currentSegment, tracks],
+  )
+  const activeTrackId = manualTrackId || stepTrackIds[0] || ''
   const activeTrack = tracks.find((t) => t.id === activeTrackId)
+  const remaining = Math.max(0, (duration || 0) - progress)
+  const endingSoon = isPlaying && duration > 0 && remaining <= 15
 
   function ensureAudioElement(): HTMLAudioElement {
     if (!audioRef.current) {
@@ -352,9 +383,13 @@ export default function LiveMode() {
     return audioRef.current
   }
 
-  function loadTrack(trackId: string) {
+  function loadTrack(trackId: string, queue?: string[]) {
     const track = tracks.find((t) => t.id === trackId)
     if (!track) return
+    cancelFade()
+    // Une musique de l'étape s'enchaîne avec les suivantes ; une musique piochée dans la
+    // bibliothèque est jouée seule.
+    queueRef.current = queue ?? (stepTrackIds.includes(trackId) ? stepTrackIds : [trackId])
     if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
     const url = URL.createObjectURL(track.blob)
     audioUrlRef.current = url
@@ -365,7 +400,7 @@ export default function LiveMode() {
     setProgress(0)
     setDuration(track.duration ?? 0)
     audio.volume = volume
-    audio.onended = () => setIsPlaying(false)
+    audio.onended = () => onTrackEndedRef.current()
     audio.onerror = () => {
       setIsPlaying(false)
       setAudioError(
@@ -396,9 +431,108 @@ export default function LiveMode() {
     })
   }
 
-  function loadAndPlayTrack(trackId: string) {
-    loadTrack(trackId)
+  function loadAndPlayTrack(trackId: string, queue?: string[]) {
+    loadTrack(trackId, queue)
     startPlayback()
+  }
+
+  /** Fin d'un morceau : on répète, on enchaîne sur le suivant de l'étape, ou on s'arrête. */
+  function onTrackEnded() {
+    const audio = audioRef.current
+    if (!audio) return
+    if (repeatMode === 'one') {
+      audio.currentTime = 0
+      startPlayback()
+      return
+    }
+    const next = neighbourTrack(1, repeatMode === 'all')
+    if (next) loadAndPlayTrack(next, queueRef.current)
+    else setIsPlaying(false)
+  }
+  const onTrackEndedRef = useRef(onTrackEnded)
+  useEffect(() => {
+    onTrackEndedRef.current = onTrackEnded
+  })
+
+  function neighbourTrack(delta: 1 | -1, wrap: boolean): string | null {
+    const queue = queueRef.current
+    const idx = queue.indexOf(loadedTrackIdRef.current ?? '')
+    if (idx < 0) return null
+    const target = idx + delta
+    if (target >= 0 && target < queue.length) return queue[target]
+    if (!wrap || queue.length === 0) return null
+    return queue[(target + queue.length) % queue.length]
+  }
+
+  function playNextTrack() {
+    if (loadedTrackIdRef.current !== activeTrackId) {
+      // Rien de chargé encore : « suivante » lance la 2e musique de l'étape.
+      const second = stepTrackIds[stepTrackIds.indexOf(activeTrackId) + 1]
+      if (second) loadAndPlayTrack(second, stepTrackIds)
+      return
+    }
+    const next = neighbourTrack(1, true)
+    if (next) loadAndPlayTrack(next, queueRef.current)
+  }
+
+  function playPrevTrack() {
+    const audio = audioRef.current
+    // Comme sur tout lecteur : après 3 s, « précédent » revient au début du morceau.
+    if (audio && audio.currentTime > 3) {
+      audio.currentTime = 0
+      setProgress(0)
+      return
+    }
+    const prev = neighbourTrack(-1, true)
+    if (prev) loadAndPlayTrack(prev, queueRef.current)
+    else if (audio) audio.currentTime = 0
+  }
+
+  function seekTo(time: number) {
+    const audio = audioRef.current
+    if (!audio || loadedTrackIdRef.current !== activeTrackId) return
+    audio.currentTime = time
+    setProgress(time)
+  }
+
+  function cycleRepeat() {
+    const next: RepeatMode = repeatMode === 'off' ? 'all' : repeatMode === 'all' ? 'one' : 'off'
+    setRepeatMode(next)
+    saveRepeatMode(next)
+  }
+
+  function cancelFade() {
+    if (fadeTimerRef.current) {
+      clearInterval(fadeTimerRef.current)
+      fadeTimerRef.current = null
+      if (audioRef.current) audioRef.current.volume = volume
+    }
+  }
+
+  /** Démarre la musique en partant du silence : une entrée tout en douceur. */
+  function fadeIn() {
+    const audio = audioRef.current
+    if (!audio || loadedTrackIdRef.current !== activeTrackId) {
+      if (!activeTrackId) return
+      loadTrack(activeTrackId)
+    }
+    const a = audioRef.current
+    if (!a) return
+    cancelFade()
+    const target = volume
+    a.volume = 0
+    if (a.paused) startPlayback()
+    const tickMs = 100
+    const steps = Math.max(1, Math.round((appSettings.defaultFadeOutSeconds * 1000) / tickMs))
+    let i = 0
+    fadeTimerRef.current = setInterval(() => {
+      i += 1
+      a.volume = Math.min(target, target * (i / steps))
+      if (i >= steps && fadeTimerRef.current) {
+        clearInterval(fadeTimerRef.current)
+        fadeTimerRef.current = null
+      }
+    }, tickMs)
   }
 
   // En changeant d'étape sans musique en cours, le lecteur propose la musique de l'étape.
@@ -454,6 +588,7 @@ export default function LiveMode() {
   function fadeOut() {
     const audio = audioRef.current
     if (!audio) return
+    if (fadeTimerRef.current) clearInterval(fadeTimerRef.current)
     const startVol = audio.volume
     const tickMs = 100
     const steps = Math.max(1, Math.round((appSettings.defaultFadeOutSeconds * 1000) / tickMs))
@@ -463,15 +598,18 @@ export default function LiveMode() {
       audio.volume = Math.max(0, startVol * (1 - i / steps))
       if (i >= steps) {
         clearInterval(t)
+        fadeTimerRef.current = null
         audio.pause()
         audio.volume = volume
         setIsPlaying(false)
       }
     }, tickMs)
+    fadeTimerRef.current = t
   }
 
   useEffect(() => {
     return () => {
+      if (fadeTimerRef.current) clearInterval(fadeTimerRef.current)
       audioRef.current?.pause()
       if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current)
     }
@@ -848,6 +986,7 @@ export default function LiveMode() {
     prevSegment: goToPrevSegment,
     toggleMusic: togglePlay,
     fadeOutMusic: fadeOut,
+    nextTrack: playNextTrack,
     nextSlide: goToNextSlide,
     prevSlide: goToPrevSlide,
     toggleSlideshow: toggleSlideshowPlaying,
@@ -1058,10 +1197,12 @@ export default function LiveMode() {
                     <span>{seg.title}</span>
                     <span className="text-xs">{seg.estimatedDuration}m</span>
                   </div>
-                  {seg.trackId && (
+                  {segmentTrackIds(seg).length > 0 && (
                     <div className="mt-0.5 flex items-center gap-1 text-xs text-muted">
                       <Icon name="music" className="h-3 w-3" />
-                      Musique assignée
+                      {segmentTrackIds(seg).length > 1
+                        ? `${segmentTrackIds(seg).length} musiques`
+                        : 'Musique assignée'}
                     </div>
                   )}
                   {seg.videoId && (
@@ -1261,22 +1402,82 @@ export default function LiveMode() {
                         {audioError}
                       </p>
                     )}
-                    <div className="mb-2 flex items-center gap-2">
+                    <div className="mb-1">
+                      <input
+                        type="range"
+                        min={0}
+                        max={duration || 1}
+                        step={0.5}
+                        value={loadedTrackIdRef.current === activeTrackId ? Math.min(progress, duration || 1) : 0}
+                        disabled={loadedTrackIdRef.current !== activeTrackId || !duration}
+                        onChange={(e) => seekTo(Number(e.target.value))}
+                        aria-label="Position dans la musique"
+                        className="w-full accent-gold disabled:opacity-40"
+                      />
+                      <div className="flex justify-between font-mono text-[11px]">
+                        <span className="text-muted">{formatClock(progress)}</span>
+                        <span className={endingSoon ? 'animate-pulse font-semibold text-danger' : 'text-muted'}>
+                          -{formatClock(remaining)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mb-2 flex items-center gap-1.5">
+                      <button
+                        onClick={playPrevTrack}
+                        title="Début du morceau / musique précédente"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-panel hover:text-fg"
+                      >
+                        ⏮
+                      </button>
                       <button
                         onClick={togglePlay}
                         className="flex h-9 w-9 items-center justify-center rounded-full border border-gold-dim text-gold hover:bg-panel"
                       >
                         {isPlaying ? '❚❚' : '▶'}
                       </button>
-                      <span className="font-mono text-xs text-muted">
-                        {formatClock(progress)} / {formatClock(duration || 0)}
-                      </span>
                       <button
-                        onClick={fadeOut}
-                        className="ml-auto rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
+                        onClick={playNextTrack}
+                        title="Musique suivante de l'étape"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-panel hover:text-fg"
                       >
-                        Fondu ↘
+                        ⏭
                       </button>
+                      <button
+                        onClick={cycleRepeat}
+                        title={
+                          repeatMode === 'off'
+                            ? 'Répétition désactivée'
+                            : repeatMode === 'all'
+                              ? "Répéter toutes les musiques de l'étape"
+                              : 'Répéter ce morceau'
+                        }
+                        className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
+                          repeatMode === 'off' ? 'text-muted hover:text-fg' : 'bg-panel text-gold'
+                        }`}
+                      >
+                        🔁
+                        {repeatMode === 'one' && (
+                          <span className="absolute -right-0.5 -top-0.5 rounded-full bg-gold px-1 text-[9px] font-bold text-ink">
+                            1
+                          </span>
+                        )}
+                      </button>
+                      <div className="ml-auto flex gap-1">
+                        <button
+                          onClick={fadeIn}
+                          title="Lancer la musique en montant doucement le volume"
+                          className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
+                        >
+                          Fondu ↗
+                        </button>
+                        <button
+                          onClick={fadeOut}
+                          title="Baisser doucement le volume puis arrêter"
+                          className="rounded-md border border-line px-2 py-1 text-xs text-muted hover:text-fg"
+                        >
+                          Fondu ↘
+                        </button>
+                      </div>
                     </div>
                     <input
                       type="range"
@@ -1291,6 +1492,32 @@ export default function LiveMode() {
                       }}
                       className="w-full"
                     />
+                  </div>
+                )}
+                {stepTrackIds.length > 1 && (
+                  <div className="mt-3">
+                    <p className="mb-1 text-xs text-muted">Musiques de l'étape</p>
+                    <ol className="space-y-1">
+                      {stepTrackIds.map((tid, idx) => {
+                        const t = tracks.find((x) => x.id === tid)
+                        if (!t) return null
+                        const current = activeTrackId === tid
+                        return (
+                          <li key={`${tid}-${idx}`}>
+                            <button
+                              onClick={() => loadAndPlayTrack(tid, stepTrackIds)}
+                              className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs ${
+                                current ? 'border-gold-dim bg-panel-2 text-gold' : 'border-line text-fg hover:bg-panel-2'
+                              }`}
+                            >
+                              <span className="w-4 text-right text-muted">{current && isPlaying ? '▶' : `${idx + 1}.`}</span>
+                              <span className="flex-1 truncate">{t.name}</span>
+                              <span className="font-mono text-muted">{formatClock(t.duration ?? NaN)}</span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ol>
                   </div>
                 )}
                 {audioOutputCapability === 'sink-select' && (

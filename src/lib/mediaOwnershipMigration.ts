@@ -1,5 +1,6 @@
 import { db } from '../db'
 import { isBuiltInTrackId } from './appSettings'
+import { segmentTrackIds } from '../types'
 
 const FLAG_KEY = 'cerema-media-ownership-migrated-v1'
 
@@ -26,7 +27,7 @@ export async function migrateMediaOwnership(): Promise<void> {
 
     const trackIds = [
       ceremony.slideshow?.trackId,
-      ...ceremony.segments.map((s) => s.trackId),
+      ...ceremony.segments.flatMap(segmentTrackIds),
     ].filter((t): t is string => Boolean(t))
 
     for (const trackId of trackIds) {

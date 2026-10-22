@@ -31,7 +31,7 @@ import type {
   Track,
   TransitionType,
 } from '../types'
-import { createEmptySegment } from '../types'
+import { createEmptySegment, segmentTrackIds } from '../types'
 
 const typeOptions: { value: CeremonyType; label: string }[] = [
   { value: 'obseques', label: 'Obsèques' },
@@ -393,8 +393,13 @@ export default function CeremonyEditor() {
       update({ slideshow: { ...draft.slideshow, trackId: undefined } })
     }
     draft?.segments
-      .filter((s) => s.trackId === track.id)
-      .forEach((s) => updateSegment(s.id, { trackId: undefined }))
+      .filter((s) => segmentTrackIds(s).includes(track.id))
+      .forEach((s) =>
+        updateSegment(s.id, {
+          trackId: undefined,
+          trackIds: segmentTrackIds(s).filter((t) => t !== track.id),
+        }),
+      )
     await db.tracks.delete(track.id)
   }
 
@@ -741,20 +746,6 @@ export default function CeremonyEditor() {
                       className="w-16 rounded-md border border-line bg-panel-2 px-2 py-1 text-right text-sm text-fg outline-none focus:border-gold-dim"
                     />
                     <span className="text-xs text-muted">min</span>
-                    <select
-                      value={seg.trackId ?? ''}
-                      onChange={(e) =>
-                        updateSegment(seg.id, { trackId: e.target.value || undefined })
-                      }
-                      className="rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
-                    >
-                      <option value="">Aucune musique</option>
-                      {selectableTracks.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                        </option>
-                      ))}
-                    </select>
                     <button
                       onClick={() => removeSegment(seg.id)}
                       className="text-xs text-muted hover:text-danger"
@@ -762,6 +753,12 @@ export default function CeremonyEditor() {
                       Supprimer
                     </button>
                   </div>
+                  <SegmentMusicList
+                    trackIds={segmentTrackIds(seg)}
+                    tracks={selectableTracks}
+                    estimatedMinutes={seg.estimatedDuration}
+                    onChange={(ids) => updateSegment(seg.id, { trackId: undefined, trackIds: ids })}
+                  />
                   <div className="flex items-start gap-2">
                     <textarea
                       value={seg.script}
@@ -1314,6 +1311,96 @@ function FixedPhotoPickerModal({
           >
             Utiliser la photo fixe de la cérémonie
           </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Musiques d'une étape : plusieurs morceaux enchaînés dans l'ordre en régie. */
+function SegmentMusicList({
+  trackIds,
+  tracks,
+  estimatedMinutes,
+  onChange,
+}: {
+  trackIds: string[]
+  tracks: Track[]
+  estimatedMinutes: number
+  onChange: (ids: string[]) => void
+}) {
+  const byId = new Map(tracks.map((t) => [t.id, t]))
+  const items = trackIds.map((id) => ({ id, track: byId.get(id) }))
+  const total = items.reduce((sum, it) => sum + (it.track?.duration ?? 0), 0)
+  const overrun = estimatedMinutes > 0 && total > estimatedMinutes * 60 + 5
+
+  function move(index: number, delta: number) {
+    const next = [...trackIds]
+    const target = index + delta
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    onChange(next)
+  }
+
+  return (
+    <div className="rounded-md border border-line bg-panel-2 px-2 py-1.5">
+      {items.length > 0 && (
+        <ol className="mb-1.5 space-y-1">
+          {items.map((it, idx) => (
+            <li key={`${it.id}-${idx}`} className="flex items-center gap-2 text-xs">
+              <span className="w-4 text-right text-muted">{idx + 1}.</span>
+              <Icon name="music" className="h-3 w-3 shrink-0 text-gold" />
+              <span className="flex-1 truncate text-fg">{it.track?.name ?? 'Musique supprimée'}</span>
+              <span className="font-mono text-muted">{formatDuration(it.track?.duration)}</span>
+              <button
+                onClick={() => move(idx, -1)}
+                disabled={idx === 0}
+                title="Monter"
+                className="px-1 text-muted hover:text-fg disabled:opacity-30"
+              >
+                ↑
+              </button>
+              <button
+                onClick={() => move(idx, 1)}
+                disabled={idx === items.length - 1}
+                title="Descendre"
+                className="px-1 text-muted hover:text-fg disabled:opacity-30"
+              >
+                ↓
+              </button>
+              <button
+                onClick={() => onChange(trackIds.filter((_, i) => i !== idx))}
+                title="Retirer de l'étape"
+                className="px-1 text-muted hover:text-danger"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className="flex items-center gap-2">
+        <select
+          value=""
+          onChange={(e) => e.target.value && onChange([...trackIds, e.target.value])}
+          className="flex-1 rounded-md border border-line bg-panel px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
+        >
+          <option value="">{items.length === 0 ? '+ Ajouter une musique' : '+ Ajouter une autre musique'}</option>
+          {tracks.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+              {t.duration ? ` (${formatDuration(t.duration)})` : ''}
+            </option>
+          ))}
+        </select>
+        {items.length > 1 && (
+          <span
+            className={`whitespace-nowrap text-[11px] ${overrun ? 'text-danger' : 'text-muted'}`}
+            title={overrun ? "Les musiques durent plus longtemps que l'étape prévue" : undefined}
+          >
+            Total {formatDuration(total)}
+            {overrun ? ` · dépasse ${estimatedMinutes} min` : ''}
+          </span>
         )}
       </div>
     </div>

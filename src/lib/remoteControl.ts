@@ -3,6 +3,7 @@ export type RemoteAction =
   | 'prevSegment'
   | 'toggleMusic'
   | 'fadeOutMusic'
+  | 'nextTrack'
   | 'nextSlide'
   | 'prevSlide'
   | 'toggleSlideshow'
@@ -17,6 +18,7 @@ export const actionOrder: RemoteAction[] = [
   'prevSegment',
   'toggleMusic',
   'fadeOutMusic',
+  'nextTrack',
   'nextSlide',
   'prevSlide',
   'toggleSlideshow',
@@ -32,6 +34,7 @@ export const actionLabels: Record<RemoteAction, string> = {
   prevSegment: 'Étape précédente',
   toggleMusic: 'Lecture / pause de la musique',
   fadeOutMusic: 'Fondu de sortie de la musique',
+  nextTrack: "Musique suivante de l'étape",
   nextSlide: 'Photo suivante',
   prevSlide: 'Photo précédente',
   toggleSlideshow: 'Lecture / pause du diaporama',
@@ -53,6 +56,7 @@ export const defaultKeymap: Keymap = {
   prevSegment: 'ArrowLeft',
   toggleMusic: ' ',
   fadeOutMusic: 'f',
+  nextTrack: 'n',
   nextSlide: 'ArrowDown',
   prevSlide: 'ArrowUp',
   toggleSlideshow: 'p',
