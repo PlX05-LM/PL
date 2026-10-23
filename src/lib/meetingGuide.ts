@@ -45,6 +45,22 @@ export interface MeetingSection {
   fields: MeetingField[]
 }
 
+/** Traits proposés pendant l'entretien : libellé affiché → [masculin, féminin]. */
+export const traitForms: Record<string, [string, string]> = {
+  'Généreux·se': ['généreux', 'généreuse'],
+  'Discret·ète': ['discret', 'discrète'],
+  Drôle: ['drôle', 'drôle'],
+  'Courageux·se': ['courageux', 'courageuse'],
+  'Exigeant·e': ['exigeant', 'exigeante'],
+  'Bon vivant': ['bon vivant', 'bonne vivante'],
+  'Curieux·se': ['curieux', 'curieuse'],
+  Fidèle: ['fidèle', 'fidèle'],
+  'Têtu·e': ['têtu', 'têtue'],
+  'Doux·ce': ['doux', 'douce'],
+  'Travailleur·se': ['travailleur', 'travailleuse'],
+  Sensible: ['sensible', 'sensible'],
+}
+
 const yesNo: [string, string][] = [
   ['oui', 'Oui'],
   ['non', 'Non'],
@@ -70,7 +86,7 @@ export const meetingSections: MeetingSection[] = [
         tip: 'Sert aux accords grammaticaux de l’ébauche d’éloge.',
       },
       { id: 'nickname', type: 'text', label: "Surnom, nom d'usage", placeholder: '« Mamie Jeanne »' },
-      { id: 'birthDate', type: 'text', label: 'Date de naissance', placeholder: '12 mars 1941', bind: { to: 'biography', key: 'birthDate' } },
+      { id: 'birthDate', type: 'date', label: 'Date de naissance', bind: { to: 'biography', key: 'birthDate' } },
       { id: 'birthPlace', type: 'text', label: 'Lieu de naissance', placeholder: 'Nantes', bind: { to: 'biography', key: 'birthPlace' } },
       { id: 'death', type: 'text', label: 'Date et lieu du décès', placeholder: '[date], [lieu]' },
       {
@@ -127,7 +143,7 @@ export const meetingSections: MeetingSection[] = [
         id: 'threeWords',
         type: 'chips',
         label: 'Trois mots pour le/la décrire',
-        options: ['Généreux·se', 'Discret·ète', 'Drôle', 'Courageux·se', 'Exigeant·e', 'Bon vivant', 'Curieux·se', 'Fidèle', 'Têtu·e', 'Doux·ce', 'Travailleur·se', 'Sensible'],
+        options: Object.keys(traitForms),
         tip: 'Faites choisir trois mots, puis demandez un exemple concret pour chacun : c’est la matière de votre hommage.',
       },
       { id: 'passions', type: 'area', label: 'Passions et loisirs', placeholder: 'Jardin, cuisine, voyages, lecture, musique…', bind: { to: 'biography', key: 'passions' } },

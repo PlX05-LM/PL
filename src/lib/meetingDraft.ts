@@ -1,13 +1,13 @@
 import type { Ceremony, CeremonySegment } from '../types'
-import { createEmptyBiography } from '../types'
 import { newId } from './ids'
-import { composeBiographyDraft, hasAnyBiographyContent } from './biographyComposer'
 import { answer, answerList } from './meetingGuide'
+import { writeClosing, writeEulogy, writeGestures, writeSpeakerIntro, writeWelcome } from './ceremonyWriter'
 
 /**
  * Premier déroulé construit à partir de la rencontre avec la famille : le maître de
- * cérémonie arrive en conception avec une trame déjà posée (musiques choisies, prises de
- * parole, gestes, ébauche de l'hommage), qu'il n'a plus qu'à affiner.
+ * cérémonie arrive en conception avec chaque étape déjà rédigée (accueil, éloge,
+ * annonces des prises de parole et des gestes, remerciements), qu'il n'a plus qu'à
+ * relire et corriger.
  */
 export function buildDraftSegments(c: Ceremony): CeremonySegment[] {
   const seg = (title: string, estimatedDuration: number, extra: Partial<CeremonySegment> = {}): CeremonySegment => ({
@@ -23,12 +23,11 @@ export function buildDraftSegments(c: Ceremony): CeremonySegment[] {
   }
 
   const name = c.deceasedName.trim()
-  const bio = c.biography ?? createEmptyBiography()
   const segments: CeremonySegment[] = [
-    seg("Entrée des proches", 3, { notes: music("Musique d'entrée", 'musicEntry') }),
-    seg("Mot d'accueil", 2),
+    seg('Entrée des proches', 3, { notes: music("Musique d'entrée", 'musicEntry') }),
+    seg("Mot d'accueil", 2, { script: writeWelcome(c) }),
     seg(name ? `Hommage à ${name}` : 'Hommage', 8, {
-      script: hasAnyBiographyContent(bio) ? composeBiographyDraft(c.deceasedName, bio) : '',
+      script: writeEulogy(c),
       notes: answer(c, 'sensitive') ? `À aborder avec délicatesse : ${answer(c, 'sensitive')}` : undefined,
     }),
   ]
@@ -43,23 +42,36 @@ export function buildDraftSegments(c: Ceremony): CeremonySegment[] {
 
   for (const line of answer(c, 'speakers').split('\n')) {
     const speaker = line.trim()
-    if (speaker) segments.push(seg(`Prise de parole — ${speaker.split(/\s+[—–-]\s+/)[0]}`, 3, { notes: speaker }))
+    if (speaker) {
+      segments.push(
+        seg(`Prise de parole — ${speaker.split(/\s+[—–-]\s+/)[0]}`, 3, {
+          script: writeSpeakerIntro(c, speaker),
+          notes: speaker,
+        }),
+      )
+    }
   }
 
   if (answer(c, 'readings')) segments.push(seg('Lecture', 3, { notes: answer(c, 'readings') }))
 
-  segments.push(seg('Recueillement', 4, { notes: music('Musique de recueillement', 'musicMeditation') }))
+  segments.push(
+    seg('Recueillement', 4, {
+      script: 'Je vous propose maintenant un moment de recueillement.',
+      notes: music('Musique de recueillement', 'musicMeditation'),
+    }),
+  )
 
   const gestures = answerList(c, 'gestures')
   if (gestures.length > 0) {
     segments.push(
       seg(gestures.length === 1 ? gestures[0] : 'Gestes symboliques', 6, {
+        script: writeGestures(c),
         notes: [gestures.join(', '), answer(c, 'gesturesDetail')].filter(Boolean).join('\n'),
       }),
     )
   }
 
-  segments.push(seg('Mot de fin et remerciements', 2))
+  segments.push(seg('Mot de fin et remerciements', 2, { script: writeClosing(c) }))
   segments.push(seg('Sortie', 3, { notes: music('Musique de sortie', 'musicExit') }))
   return segments
 }
