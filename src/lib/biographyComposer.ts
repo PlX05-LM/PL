@@ -1,6 +1,6 @@
 import type { Biography } from '../types'
 
-function agree(gender: Biography['gender'], masculine: string, feminine: string): string {
+export function agree(gender: Biography['gender'], masculine: string, feminine: string): string {
   if (gender === 'homme') return masculine
   if (gender === 'femme') return feminine
   // Accord non précisé : on garde la forme masculine avec la terminaison féminine entre
@@ -9,34 +9,34 @@ function agree(gender: Biography['gender'], masculine: string, feminine: string)
   return suffix ? `${masculine}(${suffix})` : masculine
 }
 
-function pronounCap(gender: Biography['gender']): string {
+export function pronounCap(gender: Biography['gender']): string {
   if (gender === 'homme') return 'Il'
   if (gender === 'femme') return 'Elle'
   return 'Il/elle'
 }
 
-function pronounLow(gender: Biography['gender']): string {
+export function pronounLow(gender: Biography['gender']): string {
   if (gender === 'homme') return 'il'
   if (gender === 'femme') return 'elle'
   return 'il/elle'
 }
 
 /** Pronom tonique, utilisé après une préposition (« à lui », jamais « à il »). */
-function disjunctive(gender: Biography['gender']): string {
+export function disjunctive(gender: Biography['gender']): string {
   if (gender === 'homme') return 'lui'
   if (gender === 'femme') return 'elle'
   return 'lui/elle'
 }
 
 /** Pronom complément d'objet direct atone (« on le/la décrivait »). */
-function objectPronoun(gender: Biography['gender']): string {
+export function objectPronoun(gender: Biography['gender']): string {
   if (gender === 'homme') return 'le'
   if (gender === 'femme') return 'la'
   return 'le/la'
 }
 
 /** Élision de « de » devant une voyelle ou un h muet : « de un ami » → « d'un ami ». */
-function deElided(text: string): string {
+export function deElided(text: string): string {
   const trimmed = text.trim()
   return /^[aeiouhàâéèêëîïôùûAEIOUHÀÂÉÈÊËÎÏÔÙÛ]/.test(trimmed) ? `d'${trimmed}` : `de ${trimmed}`
 }
@@ -48,21 +48,20 @@ function queElided(text: string): string {
 }
 
 /** Garantit une ponctuation finale, pour les fragments libres qui terminent une phrase. */
-function ensureSentence(text: string): string {
+export function ensureSentence(text: string): string {
   const trimmed = text.trim()
   return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`
 }
 
-function formatDate(iso?: string): string {
+export function formatDate(iso?: string): string {
   if (!iso) return ''
-  try {
-    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-  } catch {
-    return iso
-  }
+  const d = new Date(iso)
+  // Une date saisie en toutes lettres (« 12 mars 1941 ») est reprise telle quelle.
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-function joinWithAnd(items: string[]): string {
+export function joinWithAnd(items: string[]): string {
   if (items.length === 0) return ''
   if (items.length === 1) return items[0]
   return `${items.slice(0, -1).join(', ')} et ${items[items.length - 1]}`

@@ -20,7 +20,33 @@ code serait immédiatement récupérable et utilisable par n'importe qui,
 à vos frais. Le worker sert d'intermédiaire : la clé Anthropic n'existe que
 sur Cloudflare, jamais dans le navigateur ni dans le dépôt.
 
-## Déploiement (une fois)
+## Déploiement sans terminal (recommandé)
+
+Tout se fait depuis le navigateur, en trois sites web :
+
+1. **Anthropic** — sur [console.anthropic.com](https://console.anthropic.com), créez une clé API
+   (*API Keys* → *Create Key*) et ajoutez un peu de crédit (*Billing*).
+2. **Cloudflare** — créez un compte gratuit sur [dash.cloudflare.com](https://dash.cloudflare.com), puis :
+   - ouvrez une fois *Workers & Pages* (Cloudflare vous fait choisir votre sous-domaine `workers.dev`) ;
+   - notez l'**Account ID** (colonne de droite de la page d'accueil de votre compte) ;
+   - créez un jeton : *My Profile* → *API Tokens* → *Create Token* → modèle
+     **Edit Cloudflare Workers** → *Continue to summary* → *Create Token*.
+3. **GitHub** — dans le dépôt, *Settings* → *Secrets and variables* → *Actions* →
+   *New repository secret*, et créez ces quatre secrets :
+
+   | Nom | Valeur |
+   |---|---|
+   | `CLOUDFLARE_API_TOKEN` | le jeton Cloudflare |
+   | `CLOUDFLARE_ACCOUNT_ID` | l'Account ID Cloudflare |
+   | `ANTHROPIC_API_KEY` | la clé API Anthropic (`sk-ant-…`) |
+   | `APP_TOKEN` | un mot de passe long que vous inventez (le même sera saisi dans Céréo) |
+
+Puis *Actions* → **Déploiement du service IA** → *Run workflow*. Le résumé de l'exécution
+affiche l'adresse du service : collez-la dans Céréo → *Paramètres* → génération de texte
+par IA, avec le même `APP_TOKEN`. Le service se redéploie ensuite tout seul à chaque
+modification du dossier `worker/` sur `main`.
+
+## Déploiement en ligne de commande (alternative)
 
 Prérequis : un compte Cloudflare (gratuit — l'usage de ce worker reste très
 en dessous du palier payant) et une clé API sur [console.anthropic.com](https://console.anthropic.com).
