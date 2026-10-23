@@ -1,0 +1,86 @@
+name: Déploiement du service IA
+
+# Met en ligne (ou à jour) le service IA de Céréo sur Cloudflare, sans terminal :
+# Actions → « Déploiement du service IA » → Run workflow.
+# Secrets à créer une fois dans Settings → Secrets and variables → Actions :
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ANTHROPIC_API_KEY, APP_TOKEN
+# (voir worker/README.md, « Déploiement sans terminal »).
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'worker/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # « shell: bash » active pipefail : un échec de wrangler n'est pas masqué par tee.
+        shell: bash
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Vérification des secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          APP_TOKEN: ${{ secrets.APP_TOKEN }}
+        run: |
+          missing=""
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID ANTHROPIC_API_KEY APP_TOKEN; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Secrets manquants :$missing — à créer dans Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+
+      # L'espace de stockage anti-abus est créé au premier déploiement, puis réutilisé.
+      - name: Espace de stockage anti-abus
+        run: |
+          id=$(npx wrangler kv namespace list | sed -n "/^\[/,\$p" | jq -r '[.[] | select(.title | endswith("cereo-rate-limit"))][0].id // empty')
+          if [ -z "$id" ]; then
+            npx wrangler kv namespace create cereo-rate-limit
+            id=$(npx wrangler kv namespace list | sed -n "/^\[/,\$p" | jq -r '[.[] | select(.title | endswith("cereo-rate-limit"))][0].id // empty')
+          fi
+          if [ -z "$id" ]; then echo "::error::Impossible de créer l'espace de stockage RATE_LIMIT."; exit 1; fi
+          sed -i "s/REMPLACER_PAR_L_ID_RENVOYE_PAR_WRANGLER/$id/" wrangler.toml
+
+      - name: Déploiement
+        run: npx wrangler deploy | tee deploy.log
+
+      - name: Secrets du service
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          APP_TOKEN: ${{ secrets.APP_TOKEN }}
+        run: |
+          jq -n --arg k "$ANTHROPIC_API_KEY" --arg t "$APP_TOKEN" '{ANTHROPIC_API_KEY: $k, APP_TOKEN: $t}' > secrets.json
+          npx wrangler secret bulk secrets.json
+          rm secrets.json
+
+      - name: Adresse du service
+        run: |
+          url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          echo "Adresse du service IA : $url"
+          echo "### Service IA en ligne" >> "$GITHUB_STEP_SUMMARY"
+          echo "Adresse à coller dans Céréo → Paramètres → Génération de texte par IA : \`$url\`" >> "$GITHUB_STEP_SUMMARY"
