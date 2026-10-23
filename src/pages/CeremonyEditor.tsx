@@ -13,6 +13,7 @@ import CitationLibraryModal from '../components/CitationLibraryModal'
 import AudioTrimModal from '../components/AudioTrimModal'
 import AIGenerateModal from '../components/AIGenerateModal'
 import BackButton from '../components/BackButton'
+import DossierSteps from '../components/DossierSteps'
 import {
   describeVideoFormat,
   mimeTypeForVideo,
@@ -453,8 +454,30 @@ export default function CeremonyEditor() {
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-8 pb-24">
-      <div className="mb-6 flex items-center justify-between">
-        <BackButton fallback="/" />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <BackButton fallback="/conception" />
+        <div className="flex items-center gap-3">
+          <DossierSteps ceremony={draft} current={2} />
+          {draft.readyForLiveAt ? (
+            <button
+              onClick={() => update({ readyForLiveAt: undefined })}
+              className="rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-fg"
+              title="La cérémonie quitte la liste de la régie et revient en conception"
+            >
+              Retirer de la régie
+            </button>
+          ) : (
+            <button
+              onClick={() => update({ readyForLiveAt: Date.now() })}
+              className="rounded-md border border-gold-dim px-3 py-1.5 text-xs font-medium text-gold hover:bg-panel-2"
+              title="La conception est terminée : la cérémonie apparaît dans le module Régie"
+            >
+              Envoyer en régie
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="mb-6 flex items-center justify-end">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate(`/ceremonies/${draft.id}/biographie`)}

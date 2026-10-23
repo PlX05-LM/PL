@@ -3,8 +3,12 @@ import { useInstallPrompt } from '../lib/useInstallPrompt'
 import { clearSession, loadSession } from '../lib/licensing/store'
 import Icon, { type IconName } from './Icon'
 
-const navItems: { to: string; label: string; icon: IconName; end?: boolean }[] = [
-  { to: '/', label: 'Cérémonies', icon: 'flame', end: true },
+const navItems: { to: string; label: string; icon: IconName; end?: boolean; separated?: boolean }[] = [
+  { to: '/', label: 'Accueil', icon: 'home', end: true },
+  { to: '/rencontre', label: '1 · Rencontre', icon: 'user' },
+  { to: '/conception', label: '2 · Conception', icon: 'edit' },
+  { to: '/regie', label: '3 · Régie', icon: 'monitor' },
+  { to: '/dossiers', label: 'Tous les dossiers', icon: 'flame', separated: true },
   { to: '/musique', label: 'Musique libre de droit', icon: 'music' },
   { to: '/sauvegarde', label: 'Sauvegarde', icon: 'archive' },
   { to: '/parametres', label: 'Paramètres', icon: 'settings' },
@@ -37,7 +41,7 @@ export default function AppShell() {
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-md border-l-2 px-3 py-2 text-sm transition-all duration-200 ${
+                `${item.separated ? 'mt-3 ' : ''}group flex items-center gap-3 rounded-md border-l-2 px-3 py-2 text-sm transition-all duration-200 ${
                   isActive
                     ? 'border-gold bg-panel-2 text-gold'
                     : 'border-transparent text-muted hover:border-gold-dim hover:bg-panel-2 hover:text-fg'

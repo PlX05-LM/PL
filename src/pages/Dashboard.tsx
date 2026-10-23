@@ -5,6 +5,38 @@ import { createEmptyCeremony, type Ceremony } from '../types'
 import { newId } from '../lib/ids'
 import { useNavigate } from 'react-router-dom'
 import Icon from '../components/Icon'
+import DossierSteps from '../components/DossierSteps'
+import { dossierStage, stagePath, type DossierStage } from '../lib/dossierStage'
+
+export type DashboardModule = 'rencontre' | 'conception' | 'regie'
+
+/** Une liste par module : seuls les dossiers arrivés à cette étape, ouverts dans ce module. */
+const modules: Record<
+  DashboardModule,
+  { stage: DossierStage; title: string; subtitle: string; empty: string; path: (c: Ceremony) => string }
+> = {
+  rencontre: {
+    stage: 1,
+    title: 'Rencontre avec la famille',
+    subtitle: "Les dossiers dont l'entretien avec la famille reste à mener ou à terminer.",
+    empty: 'Aucune rencontre en attente. Créez un nouveau dossier pour commencer un entretien.',
+    path: (c) => `/ceremonies/${c.id}/rencontre`,
+  },
+  conception: {
+    stage: 2,
+    title: 'Conception de la cérémonie',
+    subtitle: 'Textes, déroulé, musiques et photos des cérémonies en préparation.',
+    empty: 'Aucune cérémonie en écriture. Validez une rencontre pour la retrouver ici.',
+    path: (c) => `/ceremonies/${c.id}`,
+  },
+  regie: {
+    stage: 3,
+    title: 'Régie de cérémonie',
+    subtitle: 'Les cérémonies prêtes pour le jour J.',
+    empty: 'Aucune cérémonie prête. Depuis la conception, utilisez « Envoyer en régie ».',
+    path: (c) => `/ceremonies/${c.id}/live`,
+  },
+}
 
 const typeLabels: Record<Ceremony['ceremonyType'], string> = {
   obseques: 'Obsèques',
@@ -27,10 +59,14 @@ function formatDate(iso: string) {
   }
 }
 
-export default function Dashboard() {
-  const ceremonies =
+export default function Dashboard({ module }: { module?: DashboardModule }) {
+  const config = module ? modules[module] : undefined
+  const allCeremonies =
     useLiveQuery(() => db.ceremonies.orderBy('date').reverse().toArray(), []) ??
     ([] as Ceremony[])
+  const ceremonies = config
+    ? allCeremonies.filter((c) => dossierStage(c) === config.stage)
+    : allCeremonies
   const tracks = useLiveQuery(() => db.tracks.toArray(), []) ?? []
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
@@ -40,7 +76,7 @@ export default function Dashboard() {
     const ceremony = createEmptyCeremony(newId())
     await db.ceremonies.add(ceremony)
     setCreating(false)
-    navigate(`/ceremonies/${ceremony.id}`)
+    navigate(`/ceremonies/${ceremony.id}/rencontre`)
   }
 
   async function handleDelete(id: string) {
@@ -62,7 +98,7 @@ export default function Dashboard() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="font-display text-3xl text-fg">Vos cérémonies</h2>
+            <h2 className="font-display text-3xl text-fg">{config?.title ?? 'Tous les dossiers'}</h2>
             {ceremonies.length > 0 && (
               <span className="animate-fade-in-up rounded-full border border-line bg-panel px-2.5 py-0.5 text-xs text-muted">
                 {ceremonies.length}
@@ -70,7 +106,7 @@ export default function Dashboard() {
             )}
           </div>
           <p className="mt-1 text-sm text-muted">
-            Préparez, organisez et pilotez chaque cérémonie de A à Z.
+            {config?.subtitle ?? 'Préparez, organisez et pilotez chaque cérémonie de A à Z.'}
           </p>
         </div>
         <button
@@ -81,7 +117,7 @@ export default function Dashboard() {
           <span className="mr-1 inline-block transition-transform duration-200 group-hover:rotate-90">
             +
           </span>
-          Nouvelle cérémonie
+          Nouveau dossier
         </button>
       </div>
 
@@ -91,16 +127,18 @@ export default function Dashboard() {
             <Icon name="flame" className="h-12 w-12" />
           </div>
           <p className="text-muted">
-            Aucune cérémonie pour le moment. Créez-en une pour commencer à
-            préparer le déroulé, la musique et le diaporama.
+            {config?.empty ??
+              'Aucun dossier pour le moment. Créez-en un pour commencer par la rencontre avec la famille.'}
           </p>
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            className="mt-5 rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink transition hover:bg-gold-dim disabled:opacity-60"
-          >
-            + Créer votre première cérémonie
-          </button>
+          {(!config || config.stage === 1) && (
+            <button
+              onClick={handleCreate}
+              disabled={creating}
+              className="mt-5 rounded-md bg-gold px-4 py-2 text-sm font-medium text-ink transition hover:bg-gold-dim disabled:opacity-60"
+            >
+              + Créer votre premier dossier
+            </button>
+          )}
         </div>
       ) : (
         <ul className="space-y-3">
@@ -112,7 +150,7 @@ export default function Dashboard() {
             >
               <button
                 className="flex-1 text-left"
-                onClick={() => navigate(`/ceremonies/${c.id}`)}
+                onClick={() => navigate(config ? config.path(c) : stagePath(c))}
               >
                 <div className="flex items-center gap-3">
                   <span className="font-display text-lg text-fg">
@@ -121,6 +159,7 @@ export default function Dashboard() {
                   <span className="rounded-full border border-line px-2 py-0.5 text-xs text-muted">
                     {typeLabels[c.ceremonyType]}
                   </span>
+                  {!config && <DossierSteps ceremony={c} />}
                 </div>
                 <p className="mt-1 text-sm text-muted">
                   {c.deceasedName ? `Pour ${c.deceasedName} · ` : ''}

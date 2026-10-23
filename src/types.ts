@@ -179,6 +179,22 @@ export interface Ceremony {
   liveState?: LiveState
   /** Informations biographiques recueillies auprès de la famille, pour préparer l'éloge. */
   biography?: Biography
+  /** Module 1 — rencontre avec la famille (entretien guidé). */
+  meeting?: FamilyMeeting
+  /** Module 2 → 3 : la conception est terminée, la cérémonie est prête pour la régie. */
+  readyForLiveAt?: number
+}
+
+/**
+ * Réponses de l'entretien avec la famille qui n'ont pas de place ailleurs dans le dossier
+ * (les champs déjà présents dans la fiche ou la biographie y sont enregistrés directement).
+ */
+export type MeetingAnswers = Record<string, string | string[]>
+
+export interface FamilyMeeting {
+  answers: MeetingAnswers
+  /** Rencontre validée : le dossier passe en conception. */
+  completedAt?: number
 }
 
 export function createEmptyCeremony(id: string): Ceremony {
