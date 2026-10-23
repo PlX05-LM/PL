@@ -2,7 +2,9 @@ import { useEffect } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import AppShell from './components/AppShell'
 import AccessGate from './components/AccessGate'
+import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
+import Meeting from './pages/Meeting'
 import CeremonyEditor from './pages/CeremonyEditor'
 import Biography from './pages/Biography'
 import MusicLibrary from './pages/MusicLibrary'
@@ -26,8 +28,13 @@ export default function App() {
         <Route path="/projector/:id" element={<Projector />} />
         <Route path="/ceremonies/:id/live" element={<LiveMode />} />
         <Route element={<AppShell />}>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/rencontre" element={<Dashboard module="rencontre" />} />
+          <Route path="/conception" element={<Dashboard module="conception" />} />
+          <Route path="/regie" element={<Dashboard module="regie" />} />
+          <Route path="/dossiers" element={<Dashboard />} />
           <Route path="/ceremonies/:id" element={<CeremonyEditor />} />
+          <Route path="/ceremonies/:id/rencontre" element={<Meeting />} />
           <Route path="/ceremonies/:id/biographie" element={<Biography />} />
           <Route path="/musique" element={<MusicLibrary />} />
           <Route path="/sauvegarde" element={<Backup />} />

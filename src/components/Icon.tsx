@@ -1,4 +1,5 @@
 export type IconName =
+  | 'home'
   | 'flame'
   | 'music'
   | 'archive'
@@ -29,6 +30,13 @@ interface IconProps {
 }
 
 const paths: Record<IconName, React.ReactNode> = {
+  home: (
+    <>
+      <path d="M4 11l8-7 8 7" />
+      <path d="M6 9.5V20h12V9.5" />
+      <path d="M10 20v-5h4v5" />
+    </>
+  ),
   flame: (
     <>
       <path d="M12 2c2.5 3 4 6 4 9a4 4 0 1 1-8 0c0-.9.2-1.7.6-2.4.2 1.1 1 1.9 1.9 1.9A1.5 1.5 0 0 0 12 9c0-1.3-.8-2.1-.8-3.6C11.2 4 11.6 3 12 2Z" />
