@@ -183,6 +183,25 @@ export interface Ceremony {
   meeting?: FamilyMeeting
   /** Module 2 → 3 : la conception est terminée, la cérémonie est prête pour la régie. */
   readyForLiveAt?: number
+  /** Lien envoyé à la famille pour qu'elle remplisse elle-même la rencontre. */
+  familyInvite?: FamilyInvite
+}
+
+export interface FamilyInvite {
+  /** Identifiant de l'espace sur le service en ligne. */
+  id: string
+  /** Clé de chiffrement : ne quitte jamais l'appareil, sauf dans le lien remis à la famille. */
+  key: string
+  /** Adresse du service en ligne au moment de l'invitation. */
+  endpoint: string
+  createdAt: number
+  expiresAt: number
+  /** Horodatage (côté service) du contenu initial : au-delà, la famille a répondu. */
+  initialUpdatedAt: number
+  /** Accès fermé par l'agence avant l'expiration. */
+  closedAt?: number
+  /** Dernière date (côté famille) déjà importée dans le dossier. */
+  importedUpdatedAt?: number
 }
 
 /**

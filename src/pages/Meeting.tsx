@@ -19,108 +19,13 @@ import { eulogyAiInstructions, writeEulogy } from '../lib/ceremonyWriter'
 import { AiGenerationError, generateSegmentTextAI, isAiConfigured } from '../lib/aiGeneration'
 import BackButton from '../components/BackButton'
 import DossierSteps from '../components/DossierSteps'
-import Icon from '../components/Icon'
-
-const inputClass =
-  'w-full rounded-md border border-line bg-panel-2 px-3 py-2.5 text-sm text-fg placeholder:text-muted focus:border-gold-dim focus:outline-none'
+import MeetingFieldInput from '../components/MeetingFieldInput'
+import FamilyInvitePanel from '../components/FamilyInvitePanel'
 
 const statusLabels: Record<SectionStatus, string> = {
   todo: 'À faire',
   partial: 'En partie',
   done: 'Complété',
-}
-
-function chipClass(on: boolean) {
-  return `min-h-11 rounded-full border px-4 text-sm transition-colors ${
-    on ? 'border-gold bg-gold text-ink' : 'border-line bg-panel-2 text-fg hover:border-gold-dim'
-  }`
-}
-
-function FieldInput({ field, value, onChange }: { field: MeetingField; value: FieldValue; onChange: (v: FieldValue) => void }) {
-  const id = `rencontre-${field.id}`
-  const text = typeof value === 'string' ? value : ''
-
-  let control: React.ReactNode
-  if (field.type === 'chips') {
-    const selected = Array.isArray(value) ? value : []
-    control = (
-      <div role="group" aria-label={field.label} className="flex flex-wrap gap-2">
-        {field.options.map((o) => {
-          const on = selected.includes(o)
-          return (
-            <button
-              key={o}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onChange(on ? selected.filter((x) => x !== o) : [...selected, o])}
-              className={chipClass(on)}
-            >
-              {o}
-            </button>
-          )
-        })}
-      </div>
-    )
-  } else if (field.type === 'choice') {
-    control = (
-      <div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-2">
-        {field.options.map(([v, label]) => (
-          <button
-            key={v}
-            type="button"
-            role="radio"
-            aria-checked={text === v}
-            onClick={() => onChange(text === v ? '' : v)}
-            className={chipClass(text === v)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-    )
-  } else if (field.type === 'area') {
-    control = (
-      <textarea
-        id={id}
-        rows={4}
-        value={text}
-        placeholder={field.placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${inputClass} resize-y leading-relaxed`}
-      />
-    )
-  } else {
-    control = (
-      <input
-        id={id}
-        type={field.type}
-        value={text}
-        placeholder={field.type === 'text' ? field.placeholder : undefined}
-        onChange={(e) => onChange(e.target.value)}
-        className={inputClass}
-      />
-    )
-  }
-
-  const grouped = field.type === 'chips' || field.type === 'choice'
-  return (
-    <div className="rounded-lg border border-line bg-panel p-4">
-      {grouped ? (
-        <span className="mb-2 block text-sm font-medium text-fg">{field.label}</span>
-      ) : (
-        <label htmlFor={id} className="mb-2 block text-sm font-medium text-fg">
-          {field.label}
-        </label>
-      )}
-      {field.tip && (
-        <p className="mb-3 flex items-start gap-2 text-xs leading-relaxed text-muted">
-          <Icon name="sparkle" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dim" />
-          {field.tip}
-        </p>
-      )}
-      {control}
-    </div>
-  )
 }
 
 export default function Meeting() {
@@ -153,6 +58,12 @@ export default function Meeting() {
     next.updatedAt = Date.now()
     setDraft(next)
     persist(next)
+  }
+
+  function applyCeremony(next: Ceremony) {
+    const stamped = { ...next, updatedAt: Date.now() }
+    setDraft(stamped)
+    persist(stamped)
   }
 
   const preview = useMemo(() => (draft ? buildDraftSegments(draft) : []), [draft])
@@ -268,7 +179,7 @@ export default function Meeting() {
           </div>
 
           {section.fields.map((f) => (
-            <FieldInput key={f.id} field={f} value={readField(draft, f)} onChange={(v) => setField(f, v)} />
+            <MeetingFieldInput key={f.id} field={f} value={readField(draft, f)} onChange={(v) => setField(f, v)} />
           ))}
 
           <div className="flex items-center justify-between pt-2">
@@ -362,6 +273,8 @@ export default function Meeting() {
               )}
             </section>
           )}
+
+          <FamilyInvitePanel ceremony={draft} onChange={applyCeremony} />
 
           <section className="rounded-lg border border-line bg-panel p-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Avant de partir</h2>

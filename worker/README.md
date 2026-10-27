@@ -12,6 +12,11 @@ principal).
 **Vous seul(e) contrôlez ce service** : c'est votre compte Cloudflare, votre
 clé API Anthropic, donc votre facturation. Rien n'est géré par un tiers.
 
+Le même service sert aussi au **lien famille** (formulaire rempli par la famille depuis
+son téléphone) : il conserve, pour la durée du lien, un bloc chiffré dans le navigateur
+qu'il ne peut pas lire — la clé ne figure que dans le lien remis à la famille. Ces
+blocs sont effacés automatiquement à l'expiration, ou dès que l'agence ferme l'accès.
+
 ## Pourquoi un serveur, et pas juste une clé API dans l'application ?
 
 L'application est un site statique (GitHub Pages) : tout son code est
@@ -94,6 +99,12 @@ Deux factures séparées, toutes deux sous votre compte :
   biographique ou un texte d'étape coûte l'équivalent de quelques centimes.
   Pensez à intégrer ce coût dans le prix de votre prestation si vous le
   répercutez à vos clients.
+
+**Lien famille et offre gratuite Cloudflare** : chaque enregistrement de la famille est
+une écriture dans l'espace de stockage, et l'offre gratuite en autorise 1 000 par jour
+(les réponses sont regroupées toutes les quelques secondes, soit quelques dizaines
+d'écritures par famille). Au-delà d'une dizaine de familles actives par jour, passez au
+forfait Workers Paid (5 $/mois, un million d'écritures par mois).
 
 ## Protection contre les abus
 
