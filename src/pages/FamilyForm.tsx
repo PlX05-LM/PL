@@ -5,6 +5,7 @@ import { fetchFamily, FamilyLinkError, familySections, saveFamily, type FamilyPa
 import type { FieldValue } from '../lib/meetingGuide'
 import MeetingFieldInput, { inputClass } from '../components/MeetingFieldInput'
 import Icon from '../components/Icon'
+import { UnavailableBadge } from '../components/Unavailable'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'offline' | 'error'
 
@@ -292,6 +293,19 @@ export default function FamilyForm() {
           />
         ))}
       </div>
+
+      {current.section.id === 'photos' && (
+        <div className="mt-4 rounded-lg border border-dashed border-line p-4">
+          <p className="flex items-center justify-between gap-3 text-sm font-medium text-fg">
+            Envoyer vos photos depuis ce téléphone
+            <UnavailableBadge label="Bientôt" />
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            Cette possibilité arrive prochainement. En attendant, l'agence vous indiquera comment lui transmettre vos
+            photos (clé USB, e-mail ou sur place).
+          </p>
+        </div>
+      )}
 
       <div className="mt-6 flex gap-3">
         {step > 0 && (

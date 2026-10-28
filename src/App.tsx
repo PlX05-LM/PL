@@ -6,6 +6,7 @@ import Home from './pages/Home'
 import Dashboard from './pages/Dashboard'
 import Meeting from './pages/Meeting'
 import FamilyForm from './pages/FamilyForm'
+import PaperQuestionnaire from './pages/PaperQuestionnaire'
 import CeremonyEditor from './pages/CeremonyEditor'
 import Biography from './pages/Biography'
 import MusicLibrary from './pages/MusicLibrary'
@@ -34,6 +35,7 @@ export default function App() {
             <Routes>
               <Route path="/projector/:id" element={<Projector />} />
               <Route path="/ceremonies/:id/live" element={<LiveMode />} />
+              <Route path="/ceremonies/:id/questionnaire" element={<PaperQuestionnaire />} />
               <Route element={<AppShell />}>
                 <Route path="/" element={<Home />} />
                 <Route path="/rencontre" element={<Dashboard module="rencontre" />} />

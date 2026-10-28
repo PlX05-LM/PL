@@ -21,6 +21,7 @@ import BackButton from '../components/BackButton'
 import DossierSteps from '../components/DossierSteps'
 import MeetingFieldInput from '../components/MeetingFieldInput'
 import FamilyInvitePanel from '../components/FamilyInvitePanel'
+import { ServiceRequiredNote } from '../components/Unavailable'
 
 const statusLabels: Record<SectionStatus, string> = {
   todo: 'À faire',
@@ -256,6 +257,11 @@ export default function Meeting() {
                   ? "Rédigé à partir de vos notes. À la validation, l'IA en écrit une version plus libre ; ce texte reste la solution de secours hors-ligne."
                   : 'Rédigé à partir de vos notes, sans connexion. Il sera dans le déroulé, prêt à relire.'}
               </p>
+              {!aiReady && (
+                <div className="mt-2">
+                  <ServiceRequiredNote feature="La rédaction par IA" />
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => setShowEulogy(!showEulogy)}

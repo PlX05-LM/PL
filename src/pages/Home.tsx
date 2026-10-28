@@ -8,6 +8,32 @@ import { loadSession } from '../lib/licensing/store'
 import { ceremonyTimestamp, dossierStage, isToday, stagePath } from '../lib/dossierStage'
 import DossierSteps from '../components/DossierSteps'
 import Icon, { type IconName } from '../components/Icon'
+import { ComingSoonCard, UnavailableBadge } from '../components/Unavailable'
+import { isAiConfigured } from '../lib/aiGeneration'
+
+/** Annoncées aux agences, pas encore disponibles. */
+const comingSoon = [
+  {
+    title: 'Photos envoyées par la famille',
+    description: 'Les proches déposent leurs photos depuis leur téléphone, via le lien famille ; le diaporama se construit sans clé USB.',
+  },
+  {
+    title: 'Coffret souvenir numérique',
+    description: "Après la cérémonie, un espace privé pour la famille : textes lus, musiques, diaporama, film de l'hommage.",
+  },
+  {
+    title: "Livre d'or par QR code",
+    description: 'Les invités laissent un message depuis leur téléphone, le jour J ; il est remis à la famille dans le coffret.',
+  },
+  {
+    title: 'Livret souvenir imprimé',
+    description: "Photos, textes et messages du livre d'or réunis dans un livret à commander pour la famille.",
+  },
+  {
+    title: "Suivi de l'IA par agence",
+    description: "Consommation de l'IA par licence, accès coupé automatiquement à la fin d'un abonnement.",
+  },
+]
 
 function formatWhen(c: Ceremony) {
   const t = ceremonyTimestamp(c)
@@ -85,6 +111,7 @@ export default function Home() {
   const inDesign = byStage(2).length
   const nextLive = upcoming.find((c) => dossierStage(c) === 3)
 
+  const serviceReady = isAiConfigured()
   const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
@@ -105,6 +132,19 @@ export default function Home() {
           + Nouveau dossier
         </button>
       </div>
+
+      {!serviceReady && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel px-5 py-3 text-sm">
+          <p className="flex flex-wrap items-center gap-2 text-muted">
+            <UnavailableBadge />
+            Service en ligne non configuré sur ce poste : rédaction par IA et lien famille indisponibles. Le reste
+            fonctionne normalement.
+          </p>
+          <Link to="/parametres" className="font-medium text-gold hover:text-fg">
+            Configurer
+          </Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <ModuleCard
@@ -161,6 +201,15 @@ export default function Home() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Prochainement dans Céréo</h2>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {comingSoon.map((f) => (
+            <ComingSoonCard key={f.title} {...f} />
+          ))}
+        </div>
       </section>
     </div>
   )

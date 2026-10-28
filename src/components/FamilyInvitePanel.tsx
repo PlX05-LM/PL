@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import QRCode from 'qrcode'
 import type { Ceremony } from '../types'
+import { isAiConfigured } from '../lib/aiGeneration'
+import { ServiceRequiredNote, UnavailableBadge } from './Unavailable'
 import {
   closeInvite,
   countAnswers,
@@ -25,6 +29,24 @@ function formatAgo(ts: number) {
   return `le ${new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`
 }
 
+/** Toujours disponible, même sans service en ligne : le questionnaire à imprimer. */
+function PaperAndPhotos({ ceremonyId }: { ceremonyId: string }) {
+  return (
+    <div className="mt-3 space-y-2 border-t border-line pt-3">
+      <Link
+        to={`/ceremonies/${ceremonyId}/questionnaire`}
+        className="flex min-h-11 items-center justify-center rounded-md border border-line px-3 text-sm text-muted transition-colors hover:border-gold-dim hover:text-fg"
+      >
+        Version papier à imprimer
+      </Link>
+      <p className="flex items-start justify-between gap-2 text-xs leading-relaxed text-muted">
+        <span>Envoi des photos du diaporama par la famille, depuis son téléphone.</span>
+        <UnavailableBadge label="Bientôt" />
+      </p>
+    </div>
+  )
+}
+
 const buttonClass =
   'min-h-11 rounded-md border border-line px-3 text-sm text-muted transition-colors hover:border-gold-dim hover:text-fg disabled:opacity-40'
 
@@ -42,6 +64,8 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
   const [remote, setRemote] = useState<RemoteState | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [qr, setQr] = useState<string | null>(null)
+  const serviceReady = useMemo(() => isAiConfigured(), [])
 
   const refresh = useCallback(async () => {
     if (!active) return
@@ -102,6 +126,12 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
           Envoyez à la famille un lien personnel : elle remplit depuis son téléphone, à son rythme, ce qu'elle
           souhaite. Ses réponses arrivent ici. Contenu chiffré, effacé automatiquement à l'expiration.
         </p>
+        {!serviceReady ? (
+          <div className="mt-3">
+            <ServiceRequiredNote feature="Le lien famille" />
+          </div>
+        ) : (
+          <>
         <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg">
           Valable
           <select
@@ -125,6 +155,9 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
           {busy ? 'Création…' : 'Créer le lien famille'}
         </button>
         {error && <p className="mt-2 text-xs leading-relaxed text-danger">{error}</p>}
+          </>
+        )}
+        <PaperAndPhotos ceremonyId={ceremony.id} />
       </section>
     )
   }
@@ -136,6 +169,11 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
   }. Remplissez ce que vous souhaitez, à votre rythme, et partagez-le avec vos proches si vous le voulez. Lien confidentiel, valable jusqu'au ${formatDay(active.expiresAt)} : ${url}`
   const answered = remote ? countAnswers(remote.payload) : 0
   const hasNew = remote && remote.updatedAt > (active.importedUpdatedAt ?? 0)
+
+  async function toggleQr() {
+    if (qr) return setQr(null)
+    setQr(await QRCode.toDataURL(url, { margin: 1, width: 240, color: { dark: '#0f1115', light: '#ffffff' } }))
+  }
 
   async function handleCopy() {
     try {
@@ -161,7 +199,7 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
         onFocus={(e) => e.target.select()}
         className="mt-3 w-full truncate rounded-md border border-line bg-panel-2 px-2 py-2 text-xs text-muted"
       />
-      <div className="mt-2 grid grid-cols-3 gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <button type="button" onClick={handleCopy} className={buttonClass}>
           {copied ? 'Copié ✓' : 'Copier'}
         </button>
@@ -174,7 +212,16 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
         >
           E-mail
         </a>
+        <button type="button" onClick={toggleQr} aria-expanded={Boolean(qr)} className={buttonClass}>
+          {qr ? 'Masquer le QR code' : 'QR code'}
+        </button>
       </div>
+      {qr && (
+        <figure className="mt-3 flex flex-col items-center gap-2 rounded-md bg-white p-3">
+          <img src={qr} alt="QR code du lien famille" className="h-48 w-48" />
+          <figcaption className="text-center text-xs text-ink">À scanner avec l'appareil photo du téléphone</figcaption>
+        </figure>
+      )}
 
       <div className="mt-4 rounded-md bg-panel-2 p-3 text-sm">
         {!remote ? (
@@ -216,6 +263,7 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
           Fermer l'accès
         </button>
       </div>
+      <PaperAndPhotos ceremonyId={ceremony.id} />
     </section>
   )
 }
