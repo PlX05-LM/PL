@@ -33,7 +33,8 @@ async function callWorker(path: string, body: unknown): Promise<string> {
 
   const endpoint = settings.aiEndpointUrl.trim().replace(/\/+$/, '')
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 25000)
+  // Un éloge complet prend souvent 30 à 60 secondes à rédiger.
+  const timer = setTimeout(() => controller.abort(), 90000)
 
   let response: Response
   try {

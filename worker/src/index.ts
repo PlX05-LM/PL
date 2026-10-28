@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { handleFamily } from './family'
 
 export interface Env {
   ANTHROPIC_API_KEY: string
@@ -17,7 +18,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:4321',
 ]
 
-const MODEL = 'claude-opus-5'
+const MODEL = 'claude-opus-5-5'
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const allowed = (env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean)) ?? DEFAULT_ALLOWED_ORIGINS
@@ -25,7 +26,7 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
   const allowOrigin = allowed.includes(origin) ? origin : allowed[0]
   return {
     'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, X-App-Token',
     Vary: 'Origin',
   }
@@ -137,23 +138,41 @@ function buildBiographyBrief(deceasedName: string, bio: BiographyInput): string 
   return lines.join('\n')
 }
 
+/**
+ * Appel commun au modèle. Si le modèle décline une demande (filtres de sécurité, très
+ * rare pour ce type de texte), l'API relance d'elle-même sur un modèle de secours
+ * (`fallbacks: 'default'`) ; un refus de toute la chaîne est renvoyé comme une erreur.
+ */
+async function generate(env: Env, system: string, brief: string, headers: Record<string, string>): Promise<Response> {
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+  const response = await client.beta.messages.create({
+    model: MODEL,
+    max_tokens: 16000,
+    system,
+    output_config: { effort: 'medium' },
+    betas: ['server-side-fallback-2026-07-01'],
+    fallbacks: 'default',
+    messages: [{ role: 'user', content: brief }],
+  })
+
+  if (response.stop_reason === 'refusal') {
+    return json({ error: 'Le service IA a décliné cette demande. Le texte du générateur local reste disponible.' }, 502, headers)
+  }
+  const text = response.content
+    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim()
+  if (!text) return json({ error: 'Réponse vide du modèle.' }, 502, headers)
+  return json({ text }, 200, headers)
+}
+
 async function handleGenerateBiography(request: Request, env: Env, headers: Record<string, string>): Promise<Response> {
   const body = (await request.json()) as { deceasedName?: string; bio?: BiographyInput }
   if (!body.bio) return json({ error: 'Champ "bio" manquant.' }, 400, headers)
 
   const brief = buildBiographyBrief(body.deceasedName?.trim() || 'Le défunt', body.bio)
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 3072,
-    system: BIOGRAPHY_SYSTEM_PROMPT,
-    output_config: { effort: 'medium' },
-    messages: [{ role: 'user', content: brief }],
-  })
-
-  const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text')
-  if (!textBlock) return json({ error: 'Réponse vide du modèle.' }, 502, headers)
-  return json({ text: textBlock.text.trim() }, 200, headers)
+  return generate(env, BIOGRAPHY_SYSTEM_PROMPT, brief, headers)
 }
 
 async function handleGenerateSegment(request: Request, env: Env, headers: Record<string, string>): Promise<Response> {
@@ -174,18 +193,7 @@ async function handleGenerateSegment(request: Request, env: Env, headers: Record
     .filter(Boolean)
     .join('\n')
 
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 1536,
-    system: SEGMENT_SYSTEM_PROMPT,
-    output_config: { effort: 'medium' },
-    messages: [{ role: 'user', content: brief }],
-  })
-
-  const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text')
-  if (!textBlock) return json({ error: 'Réponse vide du modèle.' }, 502, headers)
-  return json({ text: textBlock.text.trim() }, 200, headers)
+  return generate(env, SEGMENT_SYSTEM_PROMPT, brief, headers)
 }
 
 export default {
@@ -194,6 +202,19 @@ export default {
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers })
+    }
+
+    const url = new URL(request.url)
+
+    // Lien famille : accessible sans jeton d'application (le lien lui-même fait office
+    // d'accès), sauf pour créer ou fermer un espace — voir family.ts.
+    const familyMatch = url.pathname.match(/^\/family\/([^/]+)$/)
+    if (familyMatch) {
+      try {
+        return await handleFamily(request, env, familyMatch[1], (data, status) => json(data, status, headers))
+      } catch {
+        return json({ error: 'Le service est momentanément indisponible.' }, 503, headers)
+      }
     }
 
     if (request.method !== 'POST') {
@@ -210,7 +231,6 @@ export default {
       return json({ error: 'Trop de requêtes — réessayez dans quelques minutes.' }, 429, headers)
     }
 
-    const url = new URL(request.url)
     try {
       if (url.pathname === '/generate-biography') {
         return await handleGenerateBiography(request, env, headers)

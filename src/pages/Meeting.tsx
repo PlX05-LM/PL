@@ -15,110 +15,18 @@ import {
   type SectionStatus,
 } from '../lib/meetingGuide'
 import { buildDraftSegments } from '../lib/meetingDraft'
+import { eulogyAiInstructions, writeEulogy } from '../lib/ceremonyWriter'
+import { AiGenerationError, generateSegmentTextAI, isAiConfigured } from '../lib/aiGeneration'
 import BackButton from '../components/BackButton'
 import DossierSteps from '../components/DossierSteps'
-import Icon from '../components/Icon'
-
-const inputClass =
-  'w-full rounded-md border border-line bg-panel-2 px-3 py-2.5 text-sm text-fg placeholder:text-muted focus:border-gold-dim focus:outline-none'
+import MeetingFieldInput from '../components/MeetingFieldInput'
+import FamilyInvitePanel from '../components/FamilyInvitePanel'
+import { ServiceRequiredNote } from '../components/Unavailable'
 
 const statusLabels: Record<SectionStatus, string> = {
   todo: 'À faire',
   partial: 'En partie',
   done: 'Complété',
-}
-
-function chipClass(on: boolean) {
-  return `min-h-11 rounded-full border px-4 text-sm transition-colors ${
-    on ? 'border-gold bg-gold text-ink' : 'border-line bg-panel-2 text-fg hover:border-gold-dim'
-  }`
-}
-
-function FieldInput({ field, value, onChange }: { field: MeetingField; value: FieldValue; onChange: (v: FieldValue) => void }) {
-  const id = `rencontre-${field.id}`
-  const text = typeof value === 'string' ? value : ''
-
-  let control: React.ReactNode
-  if (field.type === 'chips') {
-    const selected = Array.isArray(value) ? value : []
-    control = (
-      <div role="group" aria-label={field.label} className="flex flex-wrap gap-2">
-        {field.options.map((o) => {
-          const on = selected.includes(o)
-          return (
-            <button
-              key={o}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onChange(on ? selected.filter((x) => x !== o) : [...selected, o])}
-              className={chipClass(on)}
-            >
-              {o}
-            </button>
-          )
-        })}
-      </div>
-    )
-  } else if (field.type === 'choice') {
-    control = (
-      <div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-2">
-        {field.options.map(([v, label]) => (
-          <button
-            key={v}
-            type="button"
-            role="radio"
-            aria-checked={text === v}
-            onClick={() => onChange(text === v ? '' : v)}
-            className={chipClass(text === v)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-    )
-  } else if (field.type === 'area') {
-    control = (
-      <textarea
-        id={id}
-        rows={4}
-        value={text}
-        placeholder={field.placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${inputClass} resize-y leading-relaxed`}
-      />
-    )
-  } else {
-    control = (
-      <input
-        id={id}
-        type={field.type}
-        value={text}
-        placeholder={field.type === 'text' ? field.placeholder : undefined}
-        onChange={(e) => onChange(e.target.value)}
-        className={inputClass}
-      />
-    )
-  }
-
-  const grouped = field.type === 'chips' || field.type === 'choice'
-  return (
-    <div className="rounded-lg border border-line bg-panel p-4">
-      {grouped ? (
-        <span className="mb-2 block text-sm font-medium text-fg">{field.label}</span>
-      ) : (
-        <label htmlFor={id} className="mb-2 block text-sm font-medium text-fg">
-          {field.label}
-        </label>
-      )}
-      {field.tip && (
-        <p className="mb-3 flex items-start gap-2 text-xs leading-relaxed text-muted">
-          <Icon name="sparkle" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold-dim" />
-          {field.tip}
-        </p>
-      )}
-      {control}
-    </div>
-  )
 }
 
 export default function Meeting() {
@@ -127,6 +35,9 @@ export default function Meeting() {
   const ceremony = useLiveQuery(() => (id ? db.ceremonies.get(id) : undefined), [id])
   const [draft, setDraft] = useState<Ceremony | null>(null)
   const [sectionIdx, setSectionIdx] = useState(0)
+  const [writing, setWriting] = useState(false)
+  const [showEulogy, setShowEulogy] = useState(false)
+  const aiReady = useMemo(() => isAiConfigured(), [])
 
   useEffect(() => {
     if (ceremony && ceremony.id === id) setDraft(ceremony)
@@ -150,7 +61,16 @@ export default function Meeting() {
     persist(next)
   }
 
+  function applyCeremony(next: Ceremony) {
+    const stamped = { ...next, updatedAt: Date.now() }
+    setDraft(stamped)
+    persist(stamped)
+  }
+
   const preview = useMemo(() => (draft ? buildDraftSegments(draft) : []), [draft])
+  const eulogy = useMemo(() => (draft ? writeEulogy(draft) : ''), [draft])
+  // Environ 130 mots par minute pour un texte lu posément à voix haute.
+  const eulogyMinutes = Math.max(1, Math.round(eulogy.split(/\s+/).filter(Boolean).length / 130))
 
   if (!draft || draft.id !== id) {
     return <div className="p-10 text-muted">Chargement…</div>
@@ -162,11 +82,33 @@ export default function Meeting() {
   const hasSegments = draft.segments.length > 0
 
   async function handleValidate() {
-    if (!draft) return
+    if (!draft || writing) return
+    let segments = hasSegments ? draft.segments : buildDraftSegments(draft)
+
+    // Avec l'IA configurée et du réseau, l'éloge est rédigé par l'IA ; sinon (ou en cas
+    // d'échec), le texte du générateur local, déjà en place, est conservé.
+    if (!hasSegments && aiReady) {
+      setWriting(true)
+      try {
+        const text = await generateSegmentTextAI({
+          ceremonyType: draft.ceremonyType,
+          deceasedName: draft.deceasedName,
+          segmentTitle: 'Éloge funèbre',
+          instructions: eulogyAiInstructions(draft),
+        })
+        segments = segments.map((s) => (s.title.startsWith('Hommage') ? { ...s, script: text } : s))
+      } catch (err) {
+        const reason = err instanceof AiGenerationError ? err.message : 'La rédaction par IA a échoué.'
+        alert(`${reason}\n\nL'éloge a été rédigé avec le générateur local : il est prêt à relire dans la conception.`)
+      } finally {
+        setWriting(false)
+      }
+    }
+
     const next: Ceremony = {
       ...draft,
       meeting: { answers: draft.meeting?.answers ?? {}, completedAt: Date.now() },
-      segments: hasSegments ? draft.segments : buildDraftSegments(draft),
+      segments,
       updatedAt: Date.now(),
     }
     // Remplace aussi l'enregistrement différé en attente : il ne doit pas réécrire
@@ -238,7 +180,7 @@ export default function Meeting() {
           </div>
 
           {section.fields.map((f) => (
-            <FieldInput key={f.id} field={f} value={readField(draft, f)} onChange={(v) => setField(f, v)} />
+            <MeetingFieldInput key={f.id} field={f} value={readField(draft, f)} onChange={(v) => setField(f, v)} />
           ))}
 
           <div className="flex items-center justify-between pt-2">
@@ -257,9 +199,10 @@ export default function Meeting() {
               <button
                 type="button"
                 onClick={handleValidate}
-                className="min-h-11 rounded-md bg-gold px-5 text-sm font-medium text-ink hover:bg-gold-dim"
+                disabled={writing}
+                className="min-h-11 rounded-md bg-gold px-5 text-sm font-medium text-ink hover:bg-gold-dim disabled:opacity-60"
               >
-                Valider la rencontre
+                {writing ? "Rédaction de l'éloge…" : 'Valider la rencontre'}
               </button>
             ) : (
               <button
@@ -303,18 +246,59 @@ export default function Meeting() {
             </ol>
           </section>
 
+          {!hasSegments && (
+            <section className="rounded-lg border border-line bg-panel p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Éloge en construction</h2>
+                <span className="text-xs text-muted">≈ {eulogyMinutes} min</span>
+              </div>
+              <p className="mt-1 text-xs text-muted">
+                {aiReady
+                  ? "Rédigé à partir de vos notes. À la validation, l'IA en écrit une version plus libre ; ce texte reste la solution de secours hors-ligne."
+                  : 'Rédigé à partir de vos notes, sans connexion. Il sera dans le déroulé, prêt à relire.'}
+              </p>
+              {!aiReady && (
+                <div className="mt-2">
+                  <ServiceRequiredNote feature="La rédaction par IA" />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowEulogy(!showEulogy)}
+                aria-expanded={showEulogy}
+                className="mt-3 text-sm font-medium text-gold hover:text-fg"
+              >
+                {showEulogy ? "Masquer l'éloge" : "Lire l'éloge"}
+              </button>
+              {showEulogy && (
+                <div className="mt-3 max-h-96 space-y-3 overflow-y-auto pr-1 font-display text-[15px] leading-relaxed text-fg">
+                  {eulogy.split('\n\n').map((para, i) => (
+                    <p key={i}>{para}</p>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          <FamilyInvitePanel ceremony={draft} onChange={applyCeremony} />
+
           <section className="rounded-lg border border-line bg-panel p-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">Avant de partir</h2>
             <p className="mt-2 text-xs leading-relaxed text-muted">
-              Relisez le résumé avec la famille et faites épeler les prénoms. La validation ouvre la conception de
-              la cérémonie.
+              Relisez le résumé avec la famille et faites épeler les prénoms. La validation rédige tous les textes
+              du déroulé et ouvre la conception.
             </p>
             <button
               type="button"
               onClick={handleValidate}
-              className="mt-3 min-h-11 w-full rounded-md border border-gold-dim px-3 text-sm font-medium text-gold hover:bg-panel-2"
+              disabled={writing}
+              className="mt-3 min-h-11 w-full rounded-md border border-gold-dim px-3 text-sm font-medium text-gold hover:bg-panel-2 disabled:opacity-60"
             >
-              {draft.meeting?.completedAt ? 'Revenir à la conception' : 'Valider et passer à la conception'}
+              {writing
+                ? "Rédaction de l'éloge…"
+                : draft.meeting?.completedAt
+                  ? 'Revenir à la conception'
+                  : 'Valider et passer à la conception'}
             </button>
           </section>
         </aside>

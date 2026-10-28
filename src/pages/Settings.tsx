@@ -4,6 +4,7 @@ import type { AccountRecord, LicenseRecord } from '../lib/licensing/types'
 import { loadAppSettings, saveAppSettings, type AppSettings } from '../lib/appSettings'
 import { generateSegmentTextAI } from '../lib/aiGeneration'
 import BackButton from '../components/BackButton'
+import { UnavailableBadge } from '../components/Unavailable'
 import Icon from '../components/Icon'
 
 const inputClass =
@@ -193,10 +194,24 @@ export default function Settings() {
       </section>
 
       <section className="mb-6 rounded-lg border border-line bg-panel p-5">
-        <h3 className="mb-3 font-display text-lg text-fg">Génération de texte par IA</h3>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="font-display text-lg text-fg">Service en ligne : IA et lien famille</h3>
+          {settings.aiEndpointUrl.trim() && settings.aiAppToken.trim() ? (
+            <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gold">
+              Configuré
+            </span>
+          ) : (
+            <UnavailableBadge label="Non configuré" />
+          )}
+        </div>
+        <p className="mb-2 text-xs text-muted">
+          Sans ce service, la rédaction par IA et le lien famille sont indisponibles ; tout le reste
+          fonctionne. Mise en place pas à pas, sans terminal :{' '}
+          <code className="text-fg">worker/README.md</code>, « Déploiement sans terminal ».
+        </p>
         <p className="mb-4 text-xs text-muted">
           Optionnelle et désactivée par défaut : l'application reste 100% locale sans cette
-          configuration. Une fois activée, elle vient s'ajouter au générateur local (sans IA,
+          configuration. Une fois activée, l'IA vient s'ajouter au générateur local (sans IA,
           toujours disponible) pour l'ébauche biographique et les étapes du déroulé. Nécessite une
           connexion internet — indisponible par exemple lors d'une cérémonie en cimetière hors
           réseau ; l'application détecte automatiquement l'absence de réseau et propose alors le
@@ -236,6 +251,10 @@ export default function Settings() {
         {aiTestResult === 'error' && (
           <p className="mt-2 text-xs text-danger">✕ {aiTestMessage}</p>
         )}
+        <p className="mt-4 flex items-start justify-between gap-3 border-t border-line pt-3 text-xs text-muted">
+          <span>Suivi de la consommation de l'IA par agence et accès lié à chaque licence.</span>
+          <UnavailableBadge label="Bientôt" />
+        </p>
       </section>
 
       <section className="rounded-lg border border-line bg-panel p-5">
