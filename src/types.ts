@@ -60,6 +60,12 @@ export interface Video {
 /** Son pendant une vidéo : sa propre bande-son, ou muette sur la musique de l'étape. */
 export type VideoSound = 'video' | 'music'
 
+/**
+ * Image pendant une vidéo : la vidéo elle-même, ou la photo fixe — la vidéo ne sert alors
+ * que pour son son (message vocal, chanson d'un film de famille…).
+ */
+export type VideoImage = 'video' | 'fixe'
+
 export interface SlideshowConfig {
   photoIds: string[]
   transition: TransitionType
@@ -91,6 +97,8 @@ export interface CeremonySegment {
   videoId?: string
   /** Par défaut, le son de la vidéo. */
   videoSound?: VideoSound
+  /** Par défaut, l'image de la vidéo. */
+  videoImage?: VideoImage
   /**
    * Ce que montre l'écran de projection en arrivant sur cette étape. Absent : l'écran ne
    * change pas.
