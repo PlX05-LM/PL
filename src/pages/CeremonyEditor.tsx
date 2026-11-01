@@ -194,6 +194,20 @@ export default function CeremonyEditor() {
     update({ slideshow: { ...draft.slideshow, photoIds } })
   }
 
+  // Sans ordre particulier : tout prendre d'un clic. Les photos déjà choisies gardent leur
+  // place, les autres suivent dans l'ordre d'import.
+  function selectAllPhotos() {
+    if (!draft) return
+    const missing = photos.map((p) => p.id).filter((pid) => !draft.slideshow.photoIds.includes(pid))
+    update({ slideshow: { ...draft.slideshow, photoIds: [...draft.slideshow.photoIds, ...missing] } })
+  }
+
+  function clearSlideshow() {
+    if (!draft) return
+    update({ slideshow: { ...draft.slideshow, photoIds: [] } })
+    setConfirmClear(false)
+  }
+
   function moveSelectedPhoto(index: number, dir: -1 | 1) {
     if (!draft) return
     const photoIds = [...draft.slideshow.photoIds]
@@ -210,6 +224,8 @@ export default function CeremonyEditor() {
   }
 
   const [importingPhotos, setImportingPhotos] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [showOrder, setShowOrder] = useState(false)
 
   async function handleImportPhotos(files: FileList | null) {
     if (!files || files.length === 0 || !draft) return
@@ -1051,11 +1067,23 @@ export default function CeremonyEditor() {
 
             {draft.slideshow.photoIds.length > 0 && (
               <div className="mb-4 rounded-md border border-line bg-panel-2 p-3">
-                <p className="mb-2 text-xs text-muted">
-                  Ordre du diaporama — corrigez avec les flèches plutôt que de tout resélectionner
-                  en cas d'erreur de clic.
-                </p>
-                <ul className="space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted">
+                    {draft.slideshow.shuffle
+                      ? 'Ordre aléatoire activé : les photos seront mélangées à la lecture.'
+                      : "Ordre du diaporama — corrigez avec les flèches plutôt que de tout resélectionner en cas d'erreur de clic."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowOrder(!showOrder)}
+                    aria-expanded={showOrder}
+                    className="shrink-0 text-xs font-medium text-gold hover:text-fg"
+                  >
+                    {showOrder ? "Masquer l'ordre" : `Voir l'ordre (${draft.slideshow.photoIds.length})`}
+                  </button>
+                </div>
+                {showOrder && (
+                <ul className="mt-2 space-y-1">
                   {draft.slideshow.photoIds.map((pid, i) => {
                     const p = photos.find((ph) => ph.id === pid)
                     if (!p) return null
@@ -1096,6 +1124,53 @@ export default function CeremonyEditor() {
                     )
                   })}
                 </ul>
+                )}
+              </div>
+            )}
+
+            {photos.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={selectAllPhotos}
+                  disabled={draft.slideshow.photoIds.length === photos.length}
+                  className="rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-dim disabled:opacity-40"
+                >
+                  Tout sélectionner ({photos.length})
+                </button>
+                {draft.slideshow.photoIds.length > 0 &&
+                  (confirmClear ? (
+                    <span className="flex items-center gap-2 text-xs text-muted">
+                      Retirer les {draft.slideshow.photoIds.length} photos du diaporama ?
+                      <button
+                        type="button"
+                        onClick={clearSlideshow}
+                        className="rounded-md border border-danger px-2 py-1 text-danger hover:bg-panel-2"
+                      >
+                        Oui, tout retirer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmClear(false)}
+                        className="rounded-md border border-line px-2 py-1 hover:text-fg"
+                      >
+                        Annuler
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmClear(true)}
+                      className="rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-danger hover:text-danger"
+                    >
+                      Tout retirer
+                    </button>
+                  ))}
+                {!draft.slideshow.shuffle && draft.slideshow.photoIds.length > 1 && (
+                  <span className="text-xs text-muted">
+                    Pas d'ordre particulier ? Cochez « Ordre aléatoire » plus haut.
+                  </span>
+                )}
               </div>
             )}
 
