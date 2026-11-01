@@ -38,6 +38,7 @@ export default function Projector() {
   const channelRef = useRef<BroadcastChannel | null>(null)
   const blockedRef = useRef(false)
   const videoSoundRef = useRef({ withSound: true, volume: 1 })
+  const [videoShowsImage, setVideoShowsImage] = useState(true)
 
   useEffect(() => {
     if (!id) return
@@ -68,6 +69,7 @@ export default function Projector() {
         const current = videoIdRef.current
         const nextId = msg.video?.id ?? null
         videoSoundRef.current = { withSound: msg.withSound, volume: msg.volume }
+        setVideoShowsImage(msg.showImage !== false)
         const el = videoRef.current
         if (el) {
           el.muted = !msg.withSound
@@ -201,6 +203,9 @@ export default function Projector() {
   }, [])
 
   const transitionMs = (config?.transitionDuration ?? 1) * 1000
+  // Vidéo « son seul » : elle joue, mais l'écran garde la photo fixe (s'il y en a une).
+  const audioOnlyVideo = mode === 'video' && !videoShowsImage && Boolean(fixedUrl)
+  const showFixed = mode === 'fixe' || audioOnlyVideo
 
   return (
     <div
@@ -231,8 +236,8 @@ export default function Projector() {
         {isFullscreen ? '⤢ Quitter le plein écran' : '⛶ Plein écran'}
       </button>
 
-      {connected && mode === 'fixe' && fixedUrl && (
-        <div className="absolute inset-0 bg-black">
+      {connected && showFixed && fixedUrl && (
+        <div className="absolute inset-0 bg-black" style={{ zIndex: 3 }}>
           <img src={fixedUrl} alt="" className="relative h-full w-full object-contain" />
         </div>
       )}

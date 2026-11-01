@@ -8,7 +8,7 @@ import {
   type ProjectorMessage,
   type VideoStatus,
 } from '../lib/projectorChannel'
-import { segmentTrackIds, type VideoSound } from '../types'
+import { segmentTrackIds, type VideoImage, type VideoSound } from '../types'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import { resolveAudioDuration } from '../lib/audioDuration'
 import { computePace, paceLabel } from '../lib/pace'
@@ -133,6 +133,7 @@ export default function LiveMode() {
 
   const [videoChoiceId, setVideoChoiceId] = useState<string>('')
   const [videoSound, setVideoSound] = useState<VideoSound>('video')
+  const [videoImage, setVideoImage] = useState<VideoImage>('video')
   const [videoVolume, setVideoVolume] = useState(1)
   const [videoStatus, setVideoStatus] = useState<VideoStatus | null>(null)
   const lastSentVideoKeyRef = useRef<string>('')
@@ -660,7 +661,7 @@ export default function LiveMode() {
 
   function sendVideoToProjector(force = false) {
     if (!channelRef.current) return
-    const key = `${activeVideo?.id ?? ''}|${videoSound}`
+    const key = `${activeVideo?.id ?? ''}|${videoSound}|${videoImage}`
     if (!force && key === lastSentVideoKeyRef.current) return
     lastSentVideoKeyRef.current = key
     channelRef.current.postMessage({
@@ -668,6 +669,8 @@ export default function LiveMode() {
       video: activeVideo ? { id: activeVideo.id, blob: activeVideo.blob } : null,
       withSound: videoSound === 'video',
       volume: videoVolume,
+      // Garder la photo fixe n'a de sens que si l'on entend la vidéo.
+      showImage: !(videoImage === 'fixe' && videoSound === 'video'),
     } satisfies ProjectorMessage)
   }
   const sendVideoToProjectorRef = useRef(sendVideoToProjector)
@@ -679,7 +682,7 @@ export default function LiveMode() {
     sendVideoToProjector()
     if (videoStatus && videoStatus.videoId !== activeVideo?.id) setVideoStatus(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeVideo?.id, videoSound])
+  }, [activeVideo?.id, videoSound, videoImage])
 
   useEffect(() => {
     channelRef.current?.postMessage({ type: 'videoVolume', volume: videoVolume } satisfies ProjectorMessage)
@@ -695,6 +698,7 @@ export default function LiveMode() {
     if (seg?.videoId && videos.some((v) => v.id === seg.videoId)) {
       setVideoChoiceId(seg.videoId)
       setVideoSound(seg.videoSound ?? 'video')
+      setVideoImage(seg.videoImage ?? 'video')
     } else if (!videoChoiceId && videos.length > 0) {
       setVideoChoiceId(videos[0].id)
     }
@@ -714,10 +718,12 @@ export default function LiveMode() {
   }, [segmentIndex, liveStateHydrated, ceremony?.id])
 
   function applySegmentScreen(seg: (typeof segments)[number] | undefined) {
-    if (!seg?.screen) return
+    if (!seg) return
     // Écran verrouillé : l'étape change, l'écran non (sans alerte, c'est voulu).
     if (screenLockedRef.current) return
-    if (seg.screen === 'fixe' && seg.fixedPhotoId) setLiveFixedPhotoId(seg.fixedPhotoId)
+    // La photo de l'étape sert aussi d'image pendant une vidéo « son seul ».
+    if ((seg.screen === 'fixe' || seg.videoImage === 'fixe') && seg.fixedPhotoId) setLiveFixedPhotoId(seg.fixedPhotoId)
+    if (!seg.screen) return
     // Une vidéo en cours n'est jamais coupée par un changement d'étape.
     if (photoMode === 'video') return
     if (seg.screen === 'fixe') {
@@ -854,7 +860,11 @@ export default function LiveMode() {
       }
     }
     channelRef.current = channel
-    return () => channel.close()
+    return () => {
+      // Plus rien ne doit partir sur un canal fermé (sinon postMessage lève une erreur).
+      if (channelRef.current === channel) channelRef.current = null
+      channel.close()
+    }
   }, [id])
 
   useEffect(() => {
@@ -1790,6 +1800,36 @@ export default function LiveMode() {
                         </button>
                       ))}
                     </div>
+
+                    {videoSound === 'video' && (
+                      <div className="mb-2">
+                        <p className="mb-1 text-[11px] text-muted">À l'écran pendant la vidéo</p>
+                        <div className="grid grid-cols-2 gap-1 rounded-md border border-line p-0.5 text-[11px]">
+                          {(
+                            [
+                              ['video', 'Image de la vidéo'],
+                              ['fixe', 'Photo fixe (son seul)'],
+                            ] as const
+                          ).map(([value, label]) => (
+                            <button
+                              key={value}
+                              onClick={() => setVideoImage(value)}
+                              aria-pressed={videoImage === value}
+                              className={`rounded px-2 py-1 ${
+                                videoImage === value ? 'bg-panel-2 text-gold' : 'text-muted hover:text-fg'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                        {videoImage === 'fixe' && !fixedPhoto && (
+                          <p className="mt-1 text-[11px] text-danger">
+                            Aucune photo fixe choisie : l'écran montrera l'image de la vidéo.
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {activeVideo && (
                       <VideoProgress

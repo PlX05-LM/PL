@@ -346,7 +346,7 @@ export default function CeremonyEditor() {
     if (draft?.segments.some((s) => s.videoId === video.id)) {
       update({
         segments: draft.segments.map((s) =>
-          s.videoId === video.id ? { ...s, videoId: undefined, videoSound: undefined } : s,
+          s.videoId === video.id ? { ...s, videoId: undefined, videoSound: undefined, videoImage: undefined } : s,
         ),
       })
     }
@@ -918,6 +918,19 @@ export default function CeremonyEditor() {
                         >
                           <option value="video">Avec le son de la vidéo</option>
                           <option value="music">Sans son, sur la musique de l'étape</option>
+                        </select>
+                      )}
+                      {seg.videoId && (seg.videoSound ?? 'video') === 'video' && (
+                        <select
+                          value={seg.videoImage ?? 'video'}
+                          onChange={(e) =>
+                            updateSegment(seg.id, { videoImage: e.target.value as 'video' | 'fixe' })
+                          }
+                          aria-label="Ce que montre l'écran pendant la vidéo"
+                          className="rounded-md border border-line bg-panel-2 px-2 py-1 text-xs text-fg outline-none focus:border-gold-dim"
+                        >
+                          <option value="video">À l'écran : l'image de la vidéo</option>
+                          <option value="fixe">À l'écran : la photo fixe (son de la vidéo seul)</option>
                         </select>
                       )}
                     </div>

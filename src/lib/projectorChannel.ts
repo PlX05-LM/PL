@@ -41,7 +41,14 @@ export type ProjectorMessage =
   | { type: 'ready' }
   | { type: 'black'; on: boolean }
   /** Vidéo chargée sur l'écran de projection (envoyée seulement quand elle change). */
-  | { type: 'video'; video: ProjectorVideo | null; withSound: boolean; volume: number }
+  | {
+      type: 'video'
+      video: ProjectorVideo | null
+      withSound: boolean
+      volume: number
+      /** Faux : la vidéo joue pour son son, l'écran garde la photo fixe. */
+      showImage: boolean
+    }
   | ({ type: 'videoCmd' } & VideoCommand)
   | { type: 'videoVolume'; volume: number }
   | ({ type: 'videoStatus' } & VideoStatus)
