@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import type { MeetingAnswers } from '../types'
-import { fetchFamily, FamilyLinkError, familySections, saveFamily, type FamilyPayload } from '../lib/familyLink'
+import { fetchFamily, FamilyLinkError, familySections, isSafeEndpoint, saveFamily, type FamilyPayload } from '../lib/familyLink'
 import type { FieldValue } from '../lib/meetingGuide'
 import MeetingFieldInput, { inputClass } from '../components/MeetingFieldInput'
 import Icon from '../components/Icon'
@@ -48,8 +48,8 @@ export default function FamilyForm() {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (!endpoint) {
-      setLoadError('Ce lien est incomplet : vérifiez qu’il a été copié en entier.')
+    if (!endpoint || !isSafeEndpoint(endpoint) || !/^[A-Za-z0-9_-]{43}$/.test(key)) {
+      setLoadError('Ce lien est incomplet ou n’est pas valide : vérifiez qu’il a été copié en entier.')
       return
     }
     fetchFamily(endpoint, id, key)

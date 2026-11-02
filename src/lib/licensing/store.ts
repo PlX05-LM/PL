@@ -1,9 +1,24 @@
 import { db } from '../../db'
-import { hashPassword, verifyPassword } from './crypto'
+import { hashPassword, needsRehash, verifyPassword } from './crypto'
+import { verifyLicenseKey } from './license'
 import type { AccountRecord, LicensePayload, LicenseRecord } from './types'
 
 export async function getLicense(): Promise<LicenseRecord | undefined> {
   return db.license.get('current')
+}
+
+/**
+ * Licence enregistrée sur ce poste, re-vérifiée à chaque lancement : la signature de la clé
+ * est contrôlée de nouveau, et le client et le nombre de postes viennent de la clé signée,
+ * jamais de la copie locale (modifiable avec les outils du navigateur). Une licence écrite
+ * à la main dans les données locales est ainsi rejetée.
+ */
+export async function getVerifiedLicense(): Promise<LicenseRecord | null> {
+  const record = await getLicense()
+  if (!record?.token) return null
+  const payload = await verifyLicenseKey(record.token)
+  if (!payload) return null
+  return { ...record, customer: payload.customer, seats: payload.seats }
 }
 
 export async function activateLicense(token: string, payload: LicensePayload): Promise<LicenseRecord> {
@@ -23,12 +38,13 @@ export async function listAccounts(): Promise<AccountRecord[]> {
 }
 
 export async function createAccount(username: string, password: string): Promise<AccountRecord> {
-  const { saltHex, hashHex } = await hashPassword(password)
+  const { saltHex, hashHex, iterations } = await hashPassword(password)
   const record: AccountRecord = {
     id: crypto.randomUUID(),
     username: username.trim(),
     passwordSaltHex: saltHex,
     passwordHashHex: hashHex,
+    passwordIterations: iterations,
     createdAt: Date.now(),
   }
   await db.accounts.put(record)
@@ -42,10 +58,10 @@ export async function changePassword(
 ): Promise<boolean> {
   const account = await db.accounts.get(accountId)
   if (!account) return false
-  const ok = await verifyPassword(currentPassword, account.passwordSaltHex, account.passwordHashHex)
+  const ok = await verifyPassword(currentPassword, account.passwordSaltHex, account.passwordHashHex, account.passwordIterations)
   if (!ok) return false
-  const { saltHex, hashHex } = await hashPassword(newPassword)
-  await db.accounts.update(accountId, { passwordSaltHex: saltHex, passwordHashHex: hashHex })
+  const { saltHex, hashHex, iterations } = await hashPassword(newPassword)
+  await db.accounts.update(accountId, { passwordSaltHex: saltHex, passwordHashHex: hashHex, passwordIterations: iterations })
   return true
 }
 
@@ -53,8 +69,14 @@ export async function verifyLogin(username: string, password: string): Promise<A
   const accounts = await db.accounts.toArray()
   const account = accounts.find((a) => a.username.toLowerCase() === username.trim().toLowerCase())
   if (!account) return null
-  const ok = await verifyPassword(password, account.passwordSaltHex, account.passwordHashHex)
-  return ok ? account : null
+  const ok = await verifyPassword(password, account.passwordSaltHex, account.passwordHashHex, account.passwordIterations)
+  if (!ok) return null
+  // Mot de passe enregistré avec un ancien réglage, plus faible : renforcé à la connexion.
+  if (needsRehash(account.passwordIterations)) {
+    const { saltHex, hashHex, iterations } = await hashPassword(password)
+    await db.accounts.update(account.id, { passwordSaltHex: saltHex, passwordHashHex: hashHex, passwordIterations: iterations })
+  }
+  return account
 }
 
 // --- Session : quel identifiant est connecté sur cet appareil/navigateur ---

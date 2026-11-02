@@ -10,6 +10,8 @@
  *   DELETE /family/<id>   (jeton d'application) ferme l'accès avant l'expiration
  */
 
+import { sameSecret } from './secret'
+
 interface FamilyEnv {
   APP_TOKEN: string
   RATE_LIMIT: KVNamespace
@@ -25,6 +27,12 @@ interface FamilyRecord {
 const ID_PATTERN = /^[A-Za-z0-9_-]{22}$/
 const MAX_PAYLOAD_CHARS = 400_000
 const MAX_TTL_DAYS = 30
+/**
+ * Délai minimal entre deux enregistrements d'un même lien. Le formulaire famille regroupe
+ * déjà ses envois ; ce garde-fou empêche quelqu'un qui détient un lien de le marteler et
+ * d'épuiser le quota d'écritures du service (ce qui bloquerait les autres familles).
+ */
+const MIN_WRITE_INTERVAL_MS = 1500
 const key = (id: string) => `fam:${id}`
 
 type Json = (data: unknown, status: number) => Response
@@ -55,7 +63,7 @@ async function put(env: FamilyEnv, id: string, record: FamilyRecord) {
 
 export async function handleFamily(request: Request, env: FamilyEnv, id: string, json: Json): Promise<Response> {
   if (!ID_PATTERN.test(id)) return json({ error: 'Lien invalide.' }, 404)
-  const hasAppToken = Boolean(env.APP_TOKEN) && request.headers.get('X-App-Token') === env.APP_TOKEN
+  const hasAppToken = await sameSecret(request.headers.get('X-App-Token'), env.APP_TOKEN)
   const existing = await env.RATE_LIMIT.get<FamilyRecord>(key(id), 'json')
   const alive = existing && existing.expiresAt > Date.now() ? existing : null
 
@@ -76,6 +84,9 @@ export async function handleFamily(request: Request, env: FamilyEnv, id: string,
     }
     case 'PUT': {
       if (!alive) return json({ error: 'Ce lien a expiré ou a été fermé.' }, 404)
+      if (Date.now() - alive.updatedAt < MIN_WRITE_INTERVAL_MS) {
+        return json({ error: 'Enregistrements trop rapprochés, nouvel essai dans un instant.' }, 429)
+      }
       const body = await readBody(request, json)
       if (body instanceof Response) return body
       const record: FamilyRecord = { iv: body.iv, data: body.data, expiresAt: alive.expiresAt, updatedAt: Date.now() }

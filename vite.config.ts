@@ -3,6 +3,40 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vite'
 
+/**
+ * Politique de sécurité du contenu (CSP), ajoutée à la page publiée seulement (le serveur
+ * de développement a besoin de scripts en ligne). GitHub Pages ne permet pas d'en-têtes
+ * HTTP : elle passe par une balise meta. Seuls les scripts de l'application s'exécutent ;
+ * les appels réseau ne partent qu'en HTTPS (service en ligne, moteur vidéo vérifié) ;
+ * aucun plugin, aucune page étrangère intégrée.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "worker-src 'self' blob:",
+  "connect-src 'self' https: blob: data:",
+  "img-src 'self' blob: data:",
+  "media-src 'self' blob: data:",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "frame-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+].join('; ')
+
+const securityHeaders = {
+  name: 'cereo-security-meta',
+  apply: 'build' as const,
+  transformIndexHtml(html: string) {
+    return html.replace(
+      '<meta charset="UTF-8" />',
+      `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}" />`,
+    )
+  },
+}
+
 // Sous GitHub Pages, l'appli est servie sous /<repo>/ et non à la racine du domaine.
 const base = process.env.GITHUB_PAGES ? '/PL/' : '/'
 
@@ -12,6 +46,7 @@ export default defineConfig({
   // Le worker de conversion vidéo charge le moteur FFmpeg par import() dynamique.
   worker: { format: 'es' },
   plugins: [
+    securityHeaders,
     react(),
     tailwindcss(),
     VitePWA({
