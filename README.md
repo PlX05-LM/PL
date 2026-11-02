@@ -35,12 +35,12 @@ Mesures en place (audit du 2 novembre 2026) :
 
 - **Licence** : la clé d'activation (signature ECDSA P-256) est re-vérifiée à chaque lancement ; une licence écrite à la main dans les données du navigateur est refusée, et le nombre de postes vient de la clé signée.
 - **Mots de passe** : PBKDF2-SHA256, 600 000 itérations, 8 caractères minimum ; les comptes plus anciens sont renforcés automatiquement à leur connexion.
-- **Service en ligne** (`worker/`) : jeton comparé à temps constant, demandes limitées à 64 Ko, plafond horaire par adresse et **plafond journalier global** de rédactions par IA (`DAILY_AI_LIMIT`, 300 par défaut) pour borner la facture même si le jeton fuitait ; consignes « données, pas instructions » contre l'injection de prompt ; erreurs génériques côté client ; réponses `no-store` / `nosniff`.
-- **Lien famille** : chiffrement AES-GCM 256 dans le navigateur, clé uniquement dans la partie `#` du lien ; adresse du service HTTPS obligatoire ; tout contenu reçu est validé (champs connus, types, longueurs) ; écritures d'un même lien espacées d'au moins 1,5 s.
+- **Service en ligne** (`worker/`) : jeton comparé à temps constant, demandes limitées à 64 Ko, demandes invalides refusées avant tout décompte, plafond horaire par adresse et **plafond journalier global** de rédactions par IA (`DAILY_AI_LIMIT`, 300 par défaut) pour borner la facture même si le jeton fuitait ; consignes « données, pas instructions » contre l'injection de prompt ; erreurs génériques côté client ; réponses `no-store` / `nosniff`.
+- **Lien famille** : chiffrement AES-GCM 256 dans le navigateur, clé uniquement dans la partie `#` du lien ; la version publiée n'accepte que le service de l'éditeur (`VITE_SERVICE_ORIGINS`, fixé dans `deploy-pages.yml` — à mettre à jour si son adresse change) ; tout contenu reçu est validé (champs connus, types, longueurs) ; écritures d'un même lien espacées d'au moins 1,5 s.
 - **Application** : politique de sécurité du contenu (CSP) sur la version publiée, aucun affichage dans une page tierce (anti-« clickjacking »), `no-referrer` ; sauvegardes importées validées (identifiants, types de fichiers, structure) ; moteur de conversion vidéo téléchargé vérifié par empreinte SHA-384 avant usage.
 - **Publication** : le site n'est publié que depuis `main`.
 
-Limites connues : les données restent stockées en clair dans le navigateur de chaque poste (quiconque accède à l'ordinateur ouvert y accède) et les sauvegardes ZIP ne sont pas chiffrées ; le jeton du service est présent sur chaque poste configuré.
+Limites connues : une même clé de licence s'active sur un nombre illimité d'ordinateurs (vérification hors ligne) ; la connexion par identifiant sépare les utilisateurs mais ne protège pas contre quelqu'un qui manipule le navigateur du poste ; les données restent stockées en clair dans le navigateur de chaque poste (quiconque accède à l'ordinateur ouvert y accède) et les sauvegardes ZIP ne sont pas chiffrées ; le jeton du service est présent sur chaque poste configuré.
 
 ## Démarrer en développement
 
