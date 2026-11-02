@@ -9,6 +9,31 @@
 const CORE_VERSION = '0.12.10'
 const CORE_BASE = `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${CORE_VERSION}/dist/esm`
 
+/**
+ * Empreintes SHA-384 des fichiers officiels du paquet npm @ffmpeg/core@0.12.10. Le moteur
+ * vient d'un CDN extérieur : s'il était un jour altéré (CDN ou paquet compromis), du code
+ * étranger s'exécuterait avec accès aux données de l'application. Chaque fichier est donc
+ * vérifié octet par octet avant usage, et refusé au moindre écart.
+ */
+const CORE_INTEGRITY = {
+  js: 'sha384-9KlAmgHu5wDqdgQvFhQGZOtKdCwGcMppDhM/kBkUpZ5LS7KGuAHbE+NgtJQEf84i',
+  wasm: 'sha384-U1VDhkPYrM3wTCT4/vjSpSsKqG/UjljYrYCI4hBSJ02svbCkxuCi6U6u/peg5vpW',
+}
+
+/** Télécharge un fichier, vérifie son empreinte et le renvoie en URL locale (blob:). */
+async function fetchVerified(url: string, integrity: string, type: string): Promise<string> {
+  // Pas d'option « integrity » du navigateur : en cas d'écart, elle échoue comme une simple
+  // coupure réseau. Notre propre calcul distingue un fichier altéré d'une absence de réseau.
+  const response = await fetch(url, { cache: 'force-cache' })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const bytes = await response.arrayBuffer()
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-384', bytes))
+  let binary = ''
+  for (const b of digest) binary += String.fromCharCode(b)
+  if (`sha384-${btoa(binary)}` !== integrity) throw new Error('integrity')
+  return URL.createObjectURL(new Blob([bytes], { type }))
+}
+
 interface FFmpegCore {
   FS: {
     mkdir(path: string): void
@@ -42,8 +67,8 @@ let currentId = 0
 function loadCore(): Promise<FFmpegCore> {
   if (!corePromise) {
     corePromise = (async () => {
-      const coreURL = `${CORE_BASE}/ffmpeg-core.js`
-      const wasmURL = `${CORE_BASE}/ffmpeg-core.wasm`
+      const coreURL = await fetchVerified(`${CORE_BASE}/ffmpeg-core.js`, CORE_INTEGRITY.js, 'text/javascript')
+      const wasmURL = await fetchVerified(`${CORE_BASE}/ffmpeg-core.wasm`, CORE_INTEGRITY.wasm, 'application/wasm')
       const mod = (await import(/* @vite-ignore */ coreURL)) as { default: CoreFactory }
       const core = await mod.default({
         // Même astuce que @ffmpeg/ffmpeg : l'URL du .wasm est passée dans le hash.
@@ -80,7 +105,8 @@ self.onmessage = async ({ data }: MessageEvent<ConvertRequest>) => {
     post({ id, type: 'loading' })
     core = await loadCore()
   } catch (e) {
-    post({ id, type: 'error', message: 'load', log: String(e) })
+    const refused = e instanceof Error && e.message === 'integrity'
+    post({ id, type: 'error', message: refused ? 'integrity' : 'load', log: String(e) })
     return
   }
   core.setLogger(({ message }) => {

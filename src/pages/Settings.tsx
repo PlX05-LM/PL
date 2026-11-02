@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { changePassword, getLicense, listAccounts, loadSession } from '../lib/licensing/store'
+import { changePassword, getVerifiedLicense, listAccounts, loadSession } from '../lib/licensing/store'
 import type { AccountRecord, LicenseRecord } from '../lib/licensing/types'
 import { loadAppSettings, saveAppSettings, type AppSettings } from '../lib/appSettings'
 import { generateSegmentTextAI } from '../lib/aiGeneration'
@@ -17,7 +17,7 @@ export default function Settings() {
   const session = loadSession()
 
   useEffect(() => {
-    getLicense().then((l) => setLicense(l ?? null))
+    getVerifiedLicense().then(setLicense)
     listAccounts().then(setAccounts)
   }, [])
 
@@ -61,8 +61,8 @@ export default function Settings() {
     setPasswordError(null)
     setPasswordSuccess(false)
     if (!session) return
-    if (newPassword.length < 6) {
-      setPasswordError('Le mot de passe doit contenir au moins 6 caractères.')
+    if (newPassword.length < 8) {
+      setPasswordError('Le mot de passe doit contenir au moins 8 caractères.')
       return
     }
     if (newPassword !== newPasswordConfirm) {

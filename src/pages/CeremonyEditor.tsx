@@ -310,7 +310,9 @@ export default function CeremonyEditor() {
             errors.push(
               e instanceof VideoConvertError && e.reason === 'offline'
                 ? `« ${original.name} » : ce format doit être converti en MP4, ce qui nécessite une connexion internet la première fois. Reconnectez-vous puis réimportez la vidéo.`
-                : `« ${original.name} » : conversion impossible, le fichier semble endommagé ou dans un format inconnu.`,
+                : e instanceof VideoConvertError && e.reason === 'integrity'
+                  ? `« ${original.name} » : le convertisseur téléchargé n'a pas passé le contrôle de sécurité et a été refusé. Réessayez plus tard ; si le problème persiste, convertissez la vidéo en MP4 avant de l'importer.`
+                  : `« ${original.name} » : conversion impossible, le fichier semble endommagé ou dans un format inconnu.`,
             )
             continue
           }

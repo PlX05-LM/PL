@@ -29,6 +29,19 @@ Application web (PC et tablette) pensée pour les maîtres de cérémonie du fun
 - **Accès protégé par licence** : l'application est verrouillée tant qu'une clé d'activation valide n'a pas été saisie ; chaque poste choisit ensuite son identifiant et son mot de passe (plusieurs identifiants possibles par licence, selon le nombre de postes vendus). Voir « Licences et activation » ci-dessous.
 - **Paramètres** : afficher/masquer le prompteur et le compteur d'avance/retard en régie, taille de texte et vitesse de défilement par défaut, masquer la bibliothèque libre de droit dans les sélecteurs de musique, durée du fondu de sortie, check-list technique avant le direct (désactivée par défaut, activable au besoin), configuration de la génération de texte par IA (optionnelle, voir plus bas), informations de licence et changement de mot de passe.
 
+## Sécurité
+
+Mesures en place (audit du 2 novembre 2026) :
+
+- **Licence** : la clé d'activation (signature ECDSA P-256) est re-vérifiée à chaque lancement ; une licence écrite à la main dans les données du navigateur est refusée, et le nombre de postes vient de la clé signée.
+- **Mots de passe** : PBKDF2-SHA256, 600 000 itérations, 8 caractères minimum ; les comptes plus anciens sont renforcés automatiquement à leur connexion.
+- **Service en ligne** (`worker/`) : jeton comparé à temps constant, demandes limitées à 64 Ko, plafond horaire par adresse et **plafond journalier global** de rédactions par IA (`DAILY_AI_LIMIT`, 300 par défaut) pour borner la facture même si le jeton fuitait ; consignes « données, pas instructions » contre l'injection de prompt ; erreurs génériques côté client ; réponses `no-store` / `nosniff`.
+- **Lien famille** : chiffrement AES-GCM 256 dans le navigateur, clé uniquement dans la partie `#` du lien ; adresse du service HTTPS obligatoire ; tout contenu reçu est validé (champs connus, types, longueurs) ; écritures d'un même lien espacées d'au moins 1,5 s.
+- **Application** : politique de sécurité du contenu (CSP) sur la version publiée, aucun affichage dans une page tierce (anti-« clickjacking »), `no-referrer` ; sauvegardes importées validées (identifiants, types de fichiers, structure) ; moteur de conversion vidéo téléchargé vérifié par empreinte SHA-384 avant usage.
+- **Publication** : le site n'est publié que depuis `main`.
+
+Limites connues : les données restent stockées en clair dans le navigateur de chaque poste (quiconque accède à l'ordinateur ouvert y accède) et les sauvegardes ZIP ne sont pas chiffrées ; le jeton du service est présent sur chaque poste configuré.
+
 ## Démarrer en développement
 
 ```bash

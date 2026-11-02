@@ -33,7 +33,14 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes
 }
 
-const PBKDF2_ITERATIONS = 100_000
+/** Réglage actuel (recommandation OWASP pour PBKDF2-SHA256). */
+const PBKDF2_ITERATIONS = 600_000
+/** Réglage des comptes créés avant le renforcement. */
+const LEGACY_PBKDF2_ITERATIONS = 100_000
+
+export function needsRehash(iterations: number | undefined): boolean {
+  return (iterations ?? LEGACY_PBKDF2_ITERATIONS) < PBKDF2_ITERATIONS
+}
 
 /**
  * Dérive un hash de mot de passe (PBKDF2-SHA256) avec un sel aléatoire, ou le
@@ -43,7 +50,8 @@ const PBKDF2_ITERATIONS = 100_000
 export async function hashPassword(
   password: string,
   saltHex?: string,
-): Promise<{ saltHex: string; hashHex: string }> {
+  iterations = PBKDF2_ITERATIONS,
+): Promise<{ saltHex: string; hashHex: string; iterations: number }> {
   const salt = saltHex ? hexToBytes(saltHex) : crypto.getRandomValues(new Uint8Array(16))
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -53,14 +61,19 @@ export async function hashPassword(
     ['deriveBits'],
   )
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: salt as BufferSource, iterations, hash: 'SHA-256' },
     keyMaterial,
     256,
   )
-  return { saltHex: bytesToHex(salt), hashHex: bytesToHex(new Uint8Array(bits)) }
+  return { saltHex: bytesToHex(salt), hashHex: bytesToHex(new Uint8Array(bits)), iterations }
 }
 
-export async function verifyPassword(password: string, saltHex: string, hashHex: string): Promise<boolean> {
-  const { hashHex: computed } = await hashPassword(password, saltHex)
+export async function verifyPassword(
+  password: string,
+  saltHex: string,
+  hashHex: string,
+  iterations = LEGACY_PBKDF2_ITERATIONS,
+): Promise<boolean> {
+  const { hashHex: computed } = await hashPassword(password, saltHex, iterations)
   return computed === hashHex
 }

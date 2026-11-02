@@ -3,7 +3,7 @@ import { verifyLicenseKey } from '../lib/licensing/license'
 import {
   activateLicense,
   createAccount,
-  getLicense,
+  getVerifiedLicense,
   listAccounts,
   loadSession,
   saveSession,
@@ -35,7 +35,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
   const [loginError, setLoginError] = useState<string | null>(null)
 
   async function refresh() {
-    const lic = (await getLicense()) ?? null
+    const lic = await getVerifiedLicense()
     setLicense(lic)
     if (!lic) {
       setStage('activation')
@@ -83,8 +83,8 @@ export default function AccessGate({ children }: { children: ReactNode }) {
       setCreateError('Choisissez un identifiant.')
       return
     }
-    if (newPassword.length < 6) {
-      setCreateError('Le mot de passe doit contenir au moins 6 caractères.')
+    if (newPassword.length < 8) {
+      setCreateError('Le mot de passe doit contenir au moins 8 caractères.')
       return
     }
     if (newPassword !== newPasswordConfirm) {
@@ -164,7 +164,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mot de passe (6 caractères min.)"
+                placeholder="Mot de passe (8 caractères min.)"
                 className={inputClass}
               />
               <input

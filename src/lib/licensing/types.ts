@@ -18,5 +18,7 @@ export interface AccountRecord {
   username: string
   passwordSaltHex: string
   passwordHashHex: string
+  /** Itérations PBKDF2 du hash ; absent = ancien réglage (100 000). */
+  passwordIterations?: number
   createdAt: number
 }

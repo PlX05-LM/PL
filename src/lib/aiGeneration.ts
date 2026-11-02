@@ -1,5 +1,6 @@
 import type { Biography, CeremonyType } from '../types'
 import { loadAppSettings } from './appSettings'
+import { isSafeEndpoint } from './endpoint'
 
 export type AiErrorCause = 'not-configured' | 'offline' | 'network' | 'server'
 
@@ -32,6 +33,12 @@ async function callWorker(path: string, body: unknown): Promise<string> {
   }
 
   const endpoint = settings.aiEndpointUrl.trim().replace(/\/+$/, '')
+  if (!isSafeEndpoint(endpoint)) {
+    throw new AiGenerationError(
+      "L'adresse du service doit commencer par https:// (Paramètres → Service en ligne).",
+      'not-configured',
+    )
+  }
   const controller = new AbortController()
   // Un éloge complet prend souvent 30 à 60 secondes à rédiger.
   const timer = setTimeout(() => controller.abort(), 90000)

@@ -2,9 +2,10 @@ name: Déploiement GitHub Pages
 
 on:
   push:
+    # Seule la version validée (main) est publiée : une ancienne branche de travail ne
+    # peut plus remplacer le site par une version périmée.
     branches:
       - main
-      - claude/funeral-ceremony-management-software-6f2ydn
   workflow_dispatch:
 
 permissions:

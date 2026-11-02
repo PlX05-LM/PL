@@ -1,5 +1,6 @@
 import type { Ceremony, FamilyInvite, MeetingAnswers } from '../types'
 import { loadAppSettings } from './appSettings'
+import { isSafeEndpoint } from './endpoint'
 import { meetingSections, readField, writeField, type FieldValue, type MeetingField, type MeetingSection } from './meetingGuide'
 
 /**
@@ -147,8 +148,39 @@ async function encrypt(payload: FamilyPayload, key: string) {
 
 async function decrypt(record: { iv: string; data: string }, key: string): Promise<FamilyPayload> {
   const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64url(record.iv) }, await importKey(key), fromB64url(record.data))
-  return JSON.parse(new TextDecoder().decode(plain)) as FamilyPayload
+  return sanitizePayload(JSON.parse(new TextDecoder().decode(plain)))
 }
+
+const MAX_TEXT = 10_000
+const clip = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '')
+
+/**
+ * Tout ce qui vient d'un lien famille est traité comme une saisie extérieure : quiconque
+ * détient le lien peut y écrire. Seuls les champs connus sont gardés, avec leur type
+ * attendu (texte, ou choix parmi les options prévues) et une longueur bornée.
+ */
+export function sanitizePayload(raw: unknown): FamilyPayload {
+  const p = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const rawAnswers = (p.answers && typeof p.answers === 'object' ? p.answers : {}) as Record<string, unknown>
+  const answers: MeetingAnswers = {}
+  for (const f of familyFields) {
+    const v = rawAnswers[f.id]
+    if (f.type === 'chips') {
+      if (Array.isArray(v)) answers[f.id] = v.filter((o): o is string => typeof o === 'string' && f.options.includes(o))
+    } else if (f.type === 'choice') {
+      if (typeof v === 'string' && f.options.some(([value]) => value === v)) answers[f.id] = v
+    } else if (typeof v === 'string') {
+      answers[f.id] = v.slice(0, MAX_TEXT)
+    }
+  }
+  const contributors = Array.isArray(p.contributors)
+    ? p.contributors.filter((c): c is string => typeof c === 'string').slice(0, 30).map((c) => c.slice(0, 80))
+    : []
+  const finishedAt = typeof p.finishedAt === 'number' && Number.isFinite(p.finishedAt) ? p.finishedAt : undefined
+  const updatedAt = typeof p.updatedAt === 'number' && Number.isFinite(p.updatedAt) ? p.updatedAt : 0
+  return { v: 1, deceasedName: clip(p.deceasedName, 200), answers, contributors, finishedAt, updatedAt }
+}
+
 
 // --- Service en ligne ------------------------------------------------------
 
@@ -162,6 +194,8 @@ export class FamilyLinkError extends Error {
 }
 
 async function call(endpoint: string, id: string, init: RequestInit = {}): Promise<Record<string, unknown>> {
+  if (!isSafeEndpoint(endpoint)) throw new FamilyLinkError('Adresse du service invalide : elle doit commencer par https://.')
+  if (!/^[A-Za-z0-9_-]{22}$/.test(id)) throw new FamilyLinkError('Ce lien est incomplet : vérifiez qu’il a été copié en entier.')
   if (!navigator.onLine) throw new FamilyLinkError('Pas de connexion internet.')
   let response: Response
   try {
@@ -236,3 +270,5 @@ export function inviteUrl(invite: FamilyInvite): string {
   const base = `${window.location.origin}${window.location.pathname}`
   return `${base}#/famille/${invite.id}/${invite.key}?s=${encodeURIComponent(invite.endpoint)}`
 }
+
+export { isSafeEndpoint }

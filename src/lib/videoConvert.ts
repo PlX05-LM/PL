@@ -10,9 +10,10 @@ export interface ConvertProgress {
 }
 
 export class VideoConvertError extends Error {
-  reason: 'offline' | 'failed'
+  /** integrity : le moteur téléchargé ne correspond pas à l'original, il a été refusé. */
+  reason: 'offline' | 'failed' | 'integrity'
   log: string
-  constructor(reason: 'offline' | 'failed', log = '') {
+  constructor(reason: 'offline' | 'failed' | 'integrity', log = '') {
     super(reason)
     this.reason = reason
     this.log = log
@@ -45,7 +46,12 @@ function runFFmpeg(
         resolve(msg.data)
       } else if (msg.type === 'error') {
         w.removeEventListener('message', listener)
-        reject(new VideoConvertError(msg.message === 'load' ? 'offline' : 'failed', msg.log))
+        reject(
+          new VideoConvertError(
+            msg.message === 'integrity' ? 'integrity' : msg.message === 'load' ? 'offline' : 'failed',
+            msg.log,
+          ),
+        )
       } else {
         onMessage(msg)
       }
