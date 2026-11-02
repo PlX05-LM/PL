@@ -194,7 +194,7 @@ export class FamilyLinkError extends Error {
 }
 
 async function call(endpoint: string, id: string, init: RequestInit = {}): Promise<Record<string, unknown>> {
-  if (!isSafeEndpoint(endpoint)) throw new FamilyLinkError('Adresse du service invalide : elle doit commencer par https://.')
+  if (!isSafeEndpoint(endpoint)) throw new FamilyLinkError('Adresse du service non reconnue : ce lien ne provient pas du service de l’agence.')
   if (!/^[A-Za-z0-9_-]{22}$/.test(id)) throw new FamilyLinkError('Ce lien est incomplet : vérifiez qu’il a été copié en entier.')
   if (!navigator.onLine) throw new FamilyLinkError('Pas de connexion internet.')
   let response: Response

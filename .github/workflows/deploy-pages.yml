@@ -30,6 +30,9 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES: 'true'
+          # Seul service accepté par la version publiée (IA et lien famille) : un lien
+          # trafiqué vers un autre serveur est refusé. À mettre à jour si l'adresse change.
+          VITE_SERVICE_ORIGINS: 'https://cereo-ai-proxy.gdrj46b6ps.workers.dev'
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

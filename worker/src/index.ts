@@ -210,20 +210,19 @@ async function generate(env: Env, system: string, brief: string, headers: Record
   return json({ text }, 200, headers)
 }
 
-async function handleGenerateBiography(request: Request, env: Env, headers: Record<string, string>): Promise<Response> {
-  const body = await readJson<{ deceasedName?: unknown; bio?: BiographyInput }>(request)
-  if (!body) return json({ error: 'Demande trop volumineuse ou illisible.' }, 413, headers)
-  if (!body.bio || typeof body.bio !== 'object') return json({ error: 'Champ "bio" manquant.' }, 400, headers)
+/** Demande validée, prête à être envoyée au modèle ; une erreur sinon (rien n'est décompté). */
+type Prepared = { system: string; brief: string } | { error: string; status: number }
 
-  const brief = buildBiographyBrief(str(body.deceasedName, 200).trim() || 'Le défunt', body.bio)
-  return generate(env, BIOGRAPHY_SYSTEM_PROMPT, brief, headers)
+function prepareBiography(body: Record<string, unknown>): Prepared {
+  const bio = body.bio
+  if (!bio || typeof bio !== 'object') return { error: 'Champ "bio" manquant.', status: 400 }
+  const brief = buildBiographyBrief(str(body.deceasedName, 200).trim() || 'Le défunt', bio as BiographyInput)
+  return { system: BIOGRAPHY_SYSTEM_PROMPT, brief }
 }
 
-async function handleGenerateSegment(request: Request, env: Env, headers: Record<string, string>): Promise<Response> {
-  const body = await readJson<Record<string, unknown>>(request)
-  if (!body) return json({ error: 'Demande trop volumineuse ou illisible.' }, 413, headers)
+function prepareSegment(body: Record<string, unknown>): Prepared {
   const instructions = str(body.instructions, 40_000).trim()
-  if (!instructions) return json({ error: 'Champ "instructions" manquant.' }, 400, headers)
+  if (!instructions) return { error: 'Champ "instructions" manquant.', status: 400 }
   const deceasedName = str(body.deceasedName, 200)
 
   const brief = [
@@ -235,7 +234,7 @@ async function handleGenerateSegment(request: Request, env: Env, headers: Record
     .filter(Boolean)
     .join('\n')
 
-  return generate(env, SEGMENT_SYSTEM_PROMPT, brief, headers)
+  return { system: SEGMENT_SYSTEM_PROMPT, brief }
 }
 
 export default {
@@ -268,6 +267,16 @@ export default {
       return json({ error: 'Jeton d\'application invalide.' }, 401, headers)
     }
 
+    // La demande est validée AVANT d'être décomptée : des requêtes invalides ne peuvent pas
+    // épuiser le plafond journalier et bloquer l'IA pour toute l'agence.
+    const prepare =
+      url.pathname === '/generate-biography' ? prepareBiography : url.pathname === '/generate-segment' ? prepareSegment : null
+    if (!prepare) return json({ error: 'Route inconnue.' }, 404, headers)
+    const body = await readJson<Record<string, unknown>>(request)
+    if (!body) return json({ error: 'Demande trop volumineuse ou illisible.' }, 413, headers)
+    const prepared = prepare(body)
+    if ('error' in prepared) return json({ error: prepared.error }, prepared.status, headers)
+
     let allowed: boolean
     try {
       allowed = await checkRateLimit(request, env)
@@ -280,13 +289,7 @@ export default {
     }
 
     try {
-      if (url.pathname === '/generate-biography') {
-        return await handleGenerateBiography(request, env, headers)
-      }
-      if (url.pathname === '/generate-segment') {
-        return await handleGenerateSegment(request, env, headers)
-      }
-      return json({ error: 'Route inconnue.' }, 404, headers)
+      return await generate(env, prepared.system, prepared.brief, headers)
     } catch (err) {
       // Le détail (réponse du fournisseur d'IA) reste dans les journaux du service.
       console.error('generate', err)

@@ -35,7 +35,7 @@ async function callWorker(path: string, body: unknown): Promise<string> {
   const endpoint = settings.aiEndpointUrl.trim().replace(/\/+$/, '')
   if (!isSafeEndpoint(endpoint)) {
     throw new AiGenerationError(
-      "L'adresse du service doit commencer par https:// (Paramètres → Service en ligne).",
+      "Adresse du service non reconnue : vérifiez-la dans Paramètres → Service en ligne (elle commence par https://).",
       'not-configured',
     )
   }
