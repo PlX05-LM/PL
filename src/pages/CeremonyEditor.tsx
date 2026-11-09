@@ -22,6 +22,7 @@ import {
   type VideoProbe,
 } from '../lib/videoImport'
 import { convertToPlayableMp4, VideoConvertError, type ConvertProgress } from '../lib/videoConvert'
+import { isPdf, MAX_PDF_PAGES, PdfImportError, pdfToImages } from '../lib/pdfImport'
 import Icon from '../components/Icon'
 import type {
   Video,
@@ -224,14 +225,52 @@ export default function CeremonyEditor() {
   }
 
   const [importingPhotos, setImportingPhotos] = useState(false)
+  const [photoImportStatus, setPhotoImportStatus] = useState<string | null>(null)
+  const [photoImportErrors, setPhotoImportErrors] = useState<string[]>([])
   const [confirmClear, setConfirmClear] = useState(false)
   const [showOrder, setShowOrder] = useState(false)
 
   async function handleImportPhotos(files: FileList | null) {
     if (!files || files.length === 0 || !draft) return
     setImportingPhotos(true)
+    setPhotoImportErrors([])
+    const errors: string[] = []
     let i = 0
     for (const file of Array.from(files)) {
+      // Un PDF (album scanné, faire-part…) : chaque page devient une photo, dans l'ordre.
+      if (isPdf(file)) {
+        const baseName = file.name.replace(/\.pdf$/i, '')
+        try {
+          const pages = await pdfToImages(file, (page, total) =>
+            setPhotoImportStatus(`« ${baseName} » : page ${page} / ${total}`),
+          )
+          for (const { blob, page } of pages) {
+            await db.photos.add({
+              id: newId(),
+              name: pages.length > 1 ? `${baseName} — page ${page}` : baseName,
+              blob,
+              mimeType: 'image/jpeg',
+              createdAt: Date.now() + i,
+              ceremonyId: draft.id,
+            })
+            i += 1
+          }
+        } catch (e) {
+          const reason = e instanceof PdfImportError ? e.reason : 'invalid'
+          errors.push(
+            reason === 'password'
+              ? `« ${file.name} » est protégé par un mot de passe : enregistrez-le sans protection, puis réimportez-le.`
+              : reason === 'too-many-pages'
+                ? `« ${file.name} » compte plus de ${MAX_PDF_PAGES} pages : découpez-le ou n'en gardez que les pages utiles.`
+                : reason === 'timeout'
+                  ? `« ${file.name} » est trop lourd pour être converti sur cet appareil : essayez sur un ordinateur plus récent, ou exportez ses pages en images.`
+                  : `« ${file.name} » n'a pas pu être lu : le fichier semble endommagé.`,
+          )
+        } finally {
+          setPhotoImportStatus(null)
+        }
+        continue
+      }
       const photo: Photo = {
         id: newId(),
         name: file.name.replace(/\.[^/.]+$/, ''),
@@ -243,6 +282,7 @@ export default function CeremonyEditor() {
       await db.photos.add(photo)
       i += 1
     }
+    setPhotoImportErrors(errors)
     setImportingPhotos(false)
   }
 
@@ -1069,16 +1109,29 @@ export default function CeremonyEditor() {
                 </p>
               </div>
               <label className="shrink-0 cursor-pointer whitespace-nowrap rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold">
-                {importingPhotos ? 'Import…' : '+ Importer des photos'}
+                {importingPhotos ? 'Import…' : '+ Importer des photos ou un PDF'}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,application/pdf,.pdf"
                   multiple
                   className="hidden"
                   onChange={(e) => handleImportPhotos(e.target.files)}
                 />
               </label>
             </div>
+
+            {photoImportStatus && (
+              <p className="mb-3 text-xs text-gold" aria-live="polite">
+                Conversion du PDF en photos — {photoImportStatus}
+              </p>
+            )}
+            {photoImportErrors.length > 0 && (
+              <ul className="mb-3 space-y-1 rounded-md border border-danger px-3 py-2 text-xs text-danger">
+                {photoImportErrors.map((err) => (
+                  <li key={err}>{err}</li>
+                ))}
+              </ul>
+            )}
 
             {draft.slideshow.photoIds.length > 0 && (
               <div className="mb-4 rounded-md border border-line bg-panel-2 p-3">

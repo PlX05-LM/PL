@@ -1,7 +1,9 @@
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
+import { createReadStream, readdirSync, readFileSync, statSync } from 'node:fs'
+import path from 'node:path'
 
 /**
  * Politique de sécurité du contenu (CSP), ajoutée à la page publiée seulement (le serveur
@@ -37,6 +39,40 @@ const securityHeaders = {
   },
 }
 
+/**
+ * Ressources de pdf.js (polices standard, décodeurs d'images, tables de caractères) pour
+ * l'import de PDF dans le diaporama : copiées depuis le paquet au moment de la publication
+ * (et servies telles quelles en développement), plutôt que versionnées dans le dépôt.
+ */
+const PDFJS_DIRS = ['standard_fonts', 'cmaps', 'wasm', 'iccs']
+const pdfjsRoot = path.resolve('node_modules/pdfjs-dist')
+function pdfjsAssets(): Plugin {
+  return {
+    name: 'cereo-pdfjs-assets',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const match = req.url?.match(/^\/pdfjs\/([a-z_]+)\/([A-Za-z0-9._-]+)$/)
+        if (!match || !PDFJS_DIRS.includes(match[1])) return next()
+        const file = path.join(pdfjsRoot, match[1], match[2])
+        try {
+          if (!statSync(file).isFile()) return next()
+        } catch {
+          return next()
+        }
+        createReadStream(file).pipe(res)
+      })
+    },
+    generateBundle() {
+      for (const dir of PDFJS_DIRS) {
+        for (const name of readdirSync(path.join(pdfjsRoot, dir))) {
+          if (name.startsWith('LICENSE')) continue
+          this.emitFile({ type: 'asset', fileName: `pdfjs/${dir}/${name}`, source: readFileSync(path.join(pdfjsRoot, dir, name)) })
+        }
+      }
+    },
+  }
+}
+
 // Sous GitHub Pages, l'appli est servie sous /<repo>/ et non à la racine du domaine.
 const base = process.env.GITHUB_PAGES ? '/PL/' : '/'
 
@@ -47,6 +83,7 @@ export default defineConfig({
   worker: { format: 'es' },
   plugins: [
     securityHeaders,
+    pdfjsAssets(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -75,11 +112,23 @@ export default defineConfig({
       workbox: {
         // Les musiques/photos vivent dans IndexedDB, jamais dans le cache du service worker —
         // seule la coquille de l'application (JS/CSS/HTML/icônes) est mise en cache ici.
-        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,webmanifest}'],
+        // Les ressources de pdf.js ne sont pas préchargées (elles servent rarement) :
+        // gardées en cache dès leur premier usage, pour les imports suivants hors-ligne.
+        globIgnores: ['pdfjs/**'],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         navigateFallback: `${base}index.html`,
         // Moteur de conversion vidéo (MKV, AVI… → MP4) : téléchargé au premier import qui en a
         // besoin, puis conservé pour que les conversions suivantes marchent aussi hors-ligne.
         runtimeCaching: [
+          {
+            urlPattern: /\/pdfjs\/(standard_fonts|cmaps|wasm|iccs)\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pdfjs-assets',
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/npm\/@ffmpeg\/core@/,
             handler: 'CacheFirst',
