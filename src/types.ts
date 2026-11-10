@@ -37,6 +37,26 @@ export interface Photo {
   createdAt: number
   /** Cérémonie à laquelle appartient cette photo — n'apparaît que dans cette cérémonie. */
   ceremonyId?: string
+  /**
+   * Photo d'origine, conservée dès la première retouche (recadrage, rotation, réglages) :
+   * on peut toujours reprendre une retouche ou revenir à l'original. `blob` est le résultat.
+   */
+  originalBlob?: Blob
+  originalMimeType?: string
+  /** Réglages de la retouche actuelle, appliqués à `originalBlob`. */
+  edit?: PhotoEdit
+}
+
+export interface PhotoEdit {
+  rotation: 0 | 90 | 180 | 270
+  flipH: boolean
+  /** Zone gardée, en fractions (0 à 1) de l'image déjà tournée et retournée. */
+  crop: { x: number; y: number; w: number; h: number }
+  /** 1 = inchangé. */
+  brightness: number
+  contrast: number
+  saturation: number
+  effect: 'none' | 'bw' | 'sepia'
 }
 
 /**

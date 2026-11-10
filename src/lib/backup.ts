@@ -107,7 +107,8 @@ export async function exportFullBackup(): Promise<BackupStats> {
   })
 
   const photoMetas: PhotoMeta[] = photos.map((p) => {
-    const { blob, ...meta } = p
+    // La sauvegarde garde la photo telle qu'affichée (retouche comprise), sans l'original.
+    const { blob, originalBlob: _original, originalMimeType: _originalType, edit: _edit, ...meta } = p
     const ext = extensionForImage(p.mimeType, (blob as File).name)
     const file = `photos/${p.id}.${ext}`
     zip.file(file, blob)
