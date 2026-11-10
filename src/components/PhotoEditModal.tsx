@@ -144,8 +144,14 @@ export default function PhotoEditModal({ photo, onClose }: Props) {
         else h = w / k
         const maxW = left ? fx : 1 - fx
         const maxH = top ? fy : 1 - fy
-        if (w > maxW) (w = maxW), (h = w / k)
-        if (h > maxH) (h = maxH), (w = h * k)
+        if (w > maxW) {
+          w = maxW
+          h = w / k
+        }
+        if (h > maxH) {
+          h = maxH
+          w = h * k
+        }
       }
       px = left ? fx - w : fx
       py = top ? fy - h : fy
@@ -254,7 +260,10 @@ export default function PhotoEditModal({ photo, onClose }: Props) {
                     {r.label}
                   </button>
                 ))}
-                <button type="button" onClick={() => (setRatio(null), patch({ crop: DEFAULT_EDIT.crop }))} className={button(false)}>
+                <button type="button" onClick={() => {
+                    setRatio(null)
+                    patch({ crop: DEFAULT_EDIT.crop })
+                  }} className={button(false)}>
                   Photo entière
                 </button>
               </div>
