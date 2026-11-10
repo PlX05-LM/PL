@@ -11,6 +11,7 @@ import TextLibraryModal from '../components/TextLibraryModal'
 import PoemLibraryModal from '../components/PoemLibraryModal'
 import CitationLibraryModal from '../components/CitationLibraryModal'
 import AudioTrimModal from '../components/AudioTrimModal'
+import PhotoEditModal from '../components/PhotoEditModal'
 import AIGenerateModal from '../components/AIGenerateModal'
 import BackButton from '../components/BackButton'
 import DossierSteps from '../components/DossierSteps'
@@ -228,6 +229,7 @@ export default function CeremonyEditor() {
   const [photoImportStatus, setPhotoImportStatus] = useState<string | null>(null)
   const [photoImportErrors, setPhotoImportErrors] = useState<string[]>([])
   const [confirmClear, setConfirmClear] = useState(false)
+  const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null)
   const [showOrder, setShowOrder] = useState(false)
 
   async function handleImportPhotos(files: FileList | null) {
@@ -1282,6 +1284,22 @@ export default function CeremonyEditor() {
                         ✕
                       </button>
                       <button
+                        onClick={() => setEditingPhoto(p)}
+                        className="absolute right-1 top-1 hidden rounded-full bg-ink/80 p-1 text-muted hover:text-gold group-hover:block"
+                        title="Retoucher : recadrer, pivoter, régler la lumière…"
+                        aria-label={`Retoucher ${p.name}`}
+                      >
+                        <Icon name="edit" className="h-3 w-3" />
+                      </button>
+                      {p.edit && (
+                        <span
+                          className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-ink/80 px-1.5 text-[9px] text-gold"
+                          title="Photo retouchée (l'original est conservé)"
+                        >
+                          retouchée
+                        </span>
+                      )}
+                      <button
                         onClick={() => toggleFixedPhoto(p.id)}
                         className={`absolute bottom-1 right-1 hidden rounded-full bg-ink/80 p-1 group-hover:block ${
                           isFixed ? 'text-sky-400' : 'text-muted hover:text-fg'
@@ -1300,6 +1318,7 @@ export default function CeremonyEditor() {
       </section>
 
       {trimmingTrack && <AudioTrimModal track={trimmingTrack} onClose={() => setTrimmingTrack(null)} />}
+      {editingPhoto && <PhotoEditModal photo={editingPhoto} onClose={() => setEditingPhoto(null)} />}
 
       {textLibraryForSegment && (
         <TextLibraryModal
