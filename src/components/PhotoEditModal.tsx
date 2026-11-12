@@ -13,6 +13,7 @@ import {
   rotateCrop,
   rotatedSize,
 } from '../lib/photoEditor'
+import { isImageSizeSafe } from '../lib/imageSize'
 
 interface Props {
   photo: Photo
@@ -51,7 +52,11 @@ export default function PhotoEditModal({ photo, onClose }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    loadBitmap(source)
+    isImageSizeSafe(source)
+      .then((safe) => {
+        if (!safe) throw new Error('size')
+        return loadBitmap(source)
+      })
       .then((b) => !cancelled && setBitmap(b))
       .catch(() => !cancelled && setError('Cette photo ne peut pas être ouverte pour la retouche.'))
     return () => {

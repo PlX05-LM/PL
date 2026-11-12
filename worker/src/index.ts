@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { handleFamily } from './family'
-import { sameSecret } from './secret'
+import { readTextCapped, sameSecret } from './secret'
 
 export interface Env {
   ANTHROPIC_API_KEY: string
@@ -61,10 +61,8 @@ function json(data: unknown, status: number, headers: Record<string, string>): R
 
 /** Lit un corps JSON borné en taille ; null si trop gros ou illisible. */
 async function readJson<T>(request: Request): Promise<T | null> {
-  const declared = Number(request.headers.get('Content-Length') ?? '0')
-  if (declared > MAX_AI_BODY_BYTES) return null
-  const text = await request.text()
-  if (new TextEncoder().encode(text).length > MAX_AI_BODY_BYTES) return null
+  const text = await readTextCapped(request, MAX_AI_BODY_BYTES)
+  if (text === null) return null
   try {
     const value = JSON.parse(text) as unknown
     return value && typeof value === 'object' ? (value as T) : null

@@ -40,6 +40,12 @@ export interface PdfPageImage {
   page: number
 }
 
+export interface PdfImportResult {
+  images: PdfPageImage[]
+  /** Pages illisibles (dimensions absurdes, contenu endommagé), ignorées. */
+  skipped: number[]
+}
+
 // Édition « legacy » de pdf.js : l'édition standard exige des fonctions JavaScript très
 // récentes (Map.getOrInsertComputed…) absentes de nombreux navigateurs encore en service
 // (iPad, Safari, Chrome pas tout à fait à jour), où l'import resterait bloqué sans message.
@@ -52,11 +58,41 @@ async function loadPdfjs() {
   return pdfjs
 }
 
+type PdfDocument = Awaited<ReturnType<Awaited<ReturnType<typeof loadPdfjs>>['getDocument']>['promise']>
+
+async function renderPage(doc: PdfDocument, n: number): Promise<Blob> {
+  const page = await withTimeout(doc.getPage(n))
+  try {
+    const base = page.getViewport({ scale: 1 })
+    // Page aux dimensions absurdes (nulles, minuscules, démesurément étroites) : illisible.
+    if (!(base.width >= 1 && base.height >= 1) || Math.max(base.width, base.height) / Math.min(base.width, base.height) > 20) {
+      throw new PdfImportError('invalid')
+    }
+    const scale = TARGET_LONG_SIDE / Math.max(base.width, base.height)
+    const viewport = page.getViewport({ scale })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(viewport.width))
+    canvas.height = Math.max(1, Math.round(viewport.height))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new PdfImportError('invalid')
+    // Fond blanc : une page transparente deviendrait noire en JPEG.
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    await withTimeout(page.render({ canvas, canvasContext: ctx, viewport }).promise)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+    canvas.width = canvas.height = 0
+    if (!blob) throw new PdfImportError('invalid')
+    return blob
+  } finally {
+    page.cleanup()
+  }
+}
+
 /** Transforme chaque page du PDF en image JPEG, dans l'ordre, en signalant la progression. */
 export async function pdfToImages(
   file: File,
   onProgress?: (page: number, total: number) => void,
-): Promise<PdfPageImage[]> {
+): Promise<PdfImportResult> {
   const pdfjs = await loadPdfjs()
   const assets = `${import.meta.env.BASE_URL}pdfjs/`
   const task = pdfjs.getDocument({
@@ -82,28 +118,20 @@ export async function pdfToImages(
   try {
     if (doc.numPages > MAX_PDF_PAGES) throw new PdfImportError('too-many-pages')
     const images: PdfPageImage[] = []
+    const skipped: number[] = []
     for (let n = 1; n <= doc.numPages; n++) {
       onProgress?.(n, doc.numPages)
-      const page = await withTimeout(doc.getPage(n))
-      const base = page.getViewport({ scale: 1 })
-      const scale = TARGET_LONG_SIDE / Math.max(base.width, base.height)
-      const viewport = page.getViewport({ scale })
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.round(viewport.width)
-      canvas.height = Math.round(viewport.height)
-      const ctx = canvas.getContext('2d')
-      if (!ctx) throw new PdfImportError('invalid')
-      // Fond blanc : une page transparente deviendrait noire en JPEG.
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      await withTimeout(page.render({ canvas, canvasContext: ctx, viewport }).promise)
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
-      page.cleanup()
-      canvas.width = canvas.height = 0
-      if (!blob) throw new PdfImportError('invalid')
-      images.push({ blob, page: n })
+      try {
+        images.push({ blob: await renderPage(doc, n), page: n })
+      } catch (e) {
+        // Une page bloquée arrête tout (le document est trop lourd pour l'appareil) ;
+        // une page simplement illisible est ignorée, les autres sont gardées.
+        if (e instanceof PdfImportError && e.reason === 'timeout') throw e
+        skipped.push(n)
+      }
     }
-    return images
+    if (images.length === 0) throw new PdfImportError('invalid')
+    return { images, skipped }
   } catch (e) {
     throw e instanceof PdfImportError ? e : new PdfImportError('invalid')
   } finally {

@@ -5,6 +5,7 @@ import { extensionForImage } from './imageExt'
 import { extensionForVideo } from './videoImport'
 import { toSafeFilename } from './filename'
 import { isSafeEndpoint } from './endpoint'
+import { isImageSizeSafe } from './imageSize'
 import type { Ceremony, Photo, Track, Video } from '../types'
 
 const BACKUP_VERSION = 1
@@ -24,6 +25,36 @@ interface BackupManifest {
 }
 
 // --- Validation d'une sauvegarde importée ----------------------------------
+
+/** Description de la sauvegarde (texte) : quelques Mo au plus, même pour des centaines de cérémonies. */
+const MAX_MANIFEST_BYTES = 50 * 1024 * 1024
+/** Un média réel (déjà compressé) ne se réduit presque pas : un taux énorme trahit une « bombe ». */
+const MAX_COMPRESSION_RATIO = 100
+const RATIO_CHECK_ABOVE_BYTES = 20 * 1024 * 1024
+const MAX_ENTRY_BYTES = 8 * 1024 * 1024 * 1024
+
+/** Tailles annoncées par l'archive, lues avant toute décompression. */
+function entrySizes(entry: JSZip.JSZipObject): { compressed: number; uncompressed: number } {
+  const data = (entry as unknown as { _data?: { compressedSize?: number; uncompressedSize?: number } })._data
+  return { compressed: data?.compressedSize ?? 0, uncompressed: data?.uncompressedSize ?? 0 }
+}
+
+/**
+ * Refuse une archive piégée (« bombe zip ») : quelques Mo qui se décompressent en
+ * gigaoctets et figeraient l'application. Vérifié sur toutes les entrées, avant d'en
+ * extraire une seule.
+ */
+function assertNotZipBomb(zip: JSZip) {
+  zip.forEach((path, entry) => {
+    if (entry.dir) return
+    const { compressed, uncompressed } = entrySizes(entry)
+    const limit = path === 'backup.json' ? MAX_MANIFEST_BYTES : MAX_ENTRY_BYTES
+    const ratio = compressed > 0 ? uncompressed / compressed : uncompressed > 0 ? Infinity : 1
+    if (uncompressed > limit || (uncompressed > RATIO_CHECK_ABOVE_BYTES && ratio > MAX_COMPRESSION_RATIO)) {
+      throw new Error('Cette sauvegarde contient un fichier anormal (archive piégée ou endommagée) : elle a été refusée.')
+    }
+  })
+}
 // Un fichier de sauvegarde peut venir d'ailleurs (reçu par e-mail, clé USB…) : rien n'y est
 // écrit dans l'application sans avoir été vérifié — identifiants, types de fichiers,
 // structure des cérémonies.
@@ -160,6 +191,8 @@ export async function importFullBackup(file: File): Promise<BackupStats> {
     throw new Error("Ce fichier n'est pas une sauvegarde Céréo valide (ZIP illisible).")
   }
 
+  assertNotZipBomb(zip)
+
   const manifestEntry = zip.file('backup.json')
   if (!manifestEntry) {
     throw new Error("Ce fichier n'est pas une sauvegarde Céréo valide (backup.json introuvable).")
@@ -205,6 +238,7 @@ export async function importFullBackup(file: File): Promise<BackupStats> {
     const arrayBuffer = await entry.async('arraybuffer')
     const { file: _file, duration: _duration, ...rest } = meta
     const photo: Photo = { ...rest, blob: new Blob([arrayBuffer], { type: meta.mimeType }) }
+    if (!(await isImageSizeSafe(photo.blob))) continue
     await db.photos.put(photo)
     stats.photos++
   }

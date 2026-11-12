@@ -10,7 +10,7 @@
  *   DELETE /family/<id>   (jeton d'application) ferme l'accès avant l'expiration
  */
 
-import { sameSecret } from './secret'
+import { readTextCapped, sameSecret } from './secret'
 
 interface FamilyEnv {
   APP_TOKEN: string
@@ -43,8 +43,8 @@ function isEncryptedBody(b: unknown): b is { iv: string; data: string } {
 }
 
 async function readBody(request: Request, json: Json): Promise<{ iv: string; data: string; ttlDays?: number } | Response> {
-  const text = await request.text()
-  if (text.length > MAX_PAYLOAD_CHARS) return json({ error: 'Contenu trop volumineux.' }, 413)
+  const text = await readTextCapped(request, MAX_PAYLOAD_CHARS)
+  if (text === null) return json({ error: 'Contenu trop volumineux.' }, 413)
   let body: unknown
   try {
     body = JSON.parse(text)
