@@ -166,7 +166,7 @@ export default function Dashboard({ module }: { module?: DashboardModule }) {
                   {formatDate(c.date)} à {c.time} {c.location ? `· ${c.location}` : ''}
                 </p>
               </button>
-              <div className="flex items-center gap-2 opacity-0 transition-all duration-200 group-hover:opacity-100">
+              <div className="flex items-center gap-2 opacity-0 transition-all duration-200 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
                 <button
                   onClick={() => handleExportPdf(c)}
                   className="rounded-md border border-line px-3 py-1.5 text-xs text-muted transition-colors hover:border-gold-dim hover:text-fg"

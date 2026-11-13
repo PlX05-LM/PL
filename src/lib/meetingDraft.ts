@@ -1,7 +1,19 @@
-import type { Ceremony, CeremonySegment } from '../types'
+import type { Ceremony, CeremonySegment, FamilyTextRecord } from '../types'
 import { newId } from './ids'
 import { answer, answerList } from './meetingGuide'
 import { writeClosing, writeEulogy, writeGestures, writeSpeakerIntro, writeWelcome } from './ceremonyWriter'
+
+/** Étape du déroulé pour un texte transmis par un proche, prêt à être lu. */
+export function familyTextSegment(t: FamilyTextRecord): CeremonySegment {
+  const words = t.body.split(/\s+/).filter(Boolean).length
+  return {
+    id: newId(),
+    title: `Texte de ${t.by || 'la famille'}${t.title ? ` — ${t.title}` : ''}`,
+    script: t.body,
+    estimatedDuration: Math.max(1, Math.round(words / 130)),
+    notes: `Transmis par ${t.by || 'la famille'} via le lien famille.`,
+  }
+}
 
 /**
  * Premier déroulé construit à partir de la rencontre avec la famille : le maître de
@@ -51,6 +63,8 @@ export function buildDraftSegments(c: Ceremony): CeremonySegment[] {
       )
     }
   }
+
+  for (const t of c.meeting?.familyTexts ?? []) segments.push(familyTextSegment(t))
 
   if (answer(c, 'readings')) segments.push(seg('Lecture', 3, { notes: answer(c, 'readings') }))
 

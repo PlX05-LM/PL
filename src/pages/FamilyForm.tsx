@@ -5,7 +5,8 @@ import { fetchFamily, FamilyLinkError, familySections, isSafeEndpoint, saveFamil
 import type { FieldValue } from '../lib/meetingGuide'
 import MeetingFieldInput, { inputClass } from '../components/MeetingFieldInput'
 import Icon from '../components/Icon'
-import { UnavailableBadge } from '../components/Unavailable'
+import FamilyMediaStep from '../components/FamilyMediaStep'
+import type { FamilyMediaItem, FamilyText } from '../lib/familyMedia'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'offline' | 'error'
 
@@ -38,6 +39,8 @@ export default function FamilyForm() {
   const [step, setStep] = useState(0)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [finished, setFinished] = useState(false)
+  const [media, setMedia] = useState<FamilyMediaItem[]>([])
+  const [texts, setTexts] = useState<FamilyText[]>([])
 
   const answersRef = useRef(answers)
   answersRef.current = answers
@@ -45,6 +48,11 @@ export default function FamilyForm() {
   const dirty = useRef(new Map<string, number>())
   const saving = useRef(false)
   const finishRequested = useRef(false)
+  // Fichiers et textes ajoutés ou retirés sur ce téléphone, réappliqués à chaque envoi sur la
+  // dernière version : ce qu'un autre proche a partagé entre-temps n'est jamais perdu.
+  const addedMedia = useRef(new Map<string, FamilyMediaItem>())
+  const addedTexts = useRef(new Map<string, FamilyText>())
+  const removedIds = useRef(new Set<string>())
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -56,6 +64,8 @@ export default function FamilyForm() {
       .then((state) => {
         setBase(state.payload)
         setAnswers(state.payload.answers)
+        setMedia(state.payload.media)
+        setTexts(state.payload.texts)
         setExpiresAt(state.expiresAt)
       })
       .catch((err) => setLoadError(err instanceof FamilyLinkError ? err.message : 'Ce lien ne peut pas être ouvert.'))
@@ -70,7 +80,13 @@ export default function FamilyForm() {
       // Relit la dernière version pour ne pas écraser ce qu'un autre proche a écrit.
       const remote = await fetchFamily(endpoint, id, key)
       const merged: MeetingAnswers = { ...remote.payload.answers }
-      for (const fieldId of sent.keys()) merged[fieldId] = answersRef.current[fieldId]
+      for (const fieldId of sent.keys()) if (!fieldId.startsWith('__')) merged[fieldId] = answersRef.current[fieldId]
+      const keep = <T extends { id: string }>(remoteList: T[], added: Map<string, T>) => [
+        ...remoteList.filter((x) => !removedIds.current.has(x.id)),
+        ...[...added.values()].filter((x) => !removedIds.current.has(x.id) && !remoteList.some((r) => r.id === x.id)),
+      ]
+      const mergedMedia = keep(remote.payload.media, addedMedia.current)
+      const mergedTexts = keep(remote.payload.texts, addedTexts.current)
       const who = name.trim()
       const payload: FamilyPayload = {
         ...remote.payload,
@@ -78,11 +94,15 @@ export default function FamilyForm() {
         contributors: who && !remote.payload.contributors.includes(who) ? [...remote.payload.contributors, who] : remote.payload.contributors,
         finishedAt: finishRequested.current ? Date.now() : remote.payload.finishedAt,
         updatedAt: Date.now(),
+        media: mergedMedia,
+        texts: mergedTexts,
       }
       await saveFamily(endpoint, id, key, payload)
       for (const [fieldId, version] of sent) {
         if (dirty.current.get(fieldId) === version) dirty.current.delete(fieldId)
       }
+      setMedia(mergedMedia)
+      setTexts(mergedTexts)
       // Ce que les autres proches ont saisi entre-temps apparaît aussi ici.
       setAnswers((current) => {
         const next = { ...merged }
@@ -120,6 +140,31 @@ export default function FamilyForm() {
       document.removeEventListener('visibilitychange', onHide)
     }
   }, [flush])
+
+  function markMediaChanged() {
+    dirty.current.set('__media', (dirty.current.get('__media') ?? 0) + 1)
+    setSaveState('idle')
+    schedule(300)
+  }
+
+  function addMedia(item: FamilyMediaItem) {
+    addedMedia.current.set(item.id, item)
+    setMedia((m) => [...m, item])
+    markMediaChanged()
+  }
+
+  function addText(text: FamilyText) {
+    addedTexts.current.set(text.id, text)
+    setTexts((t) => [...t, text])
+    markMediaChanged()
+  }
+
+  function removeShared(itemId: string) {
+    removedIds.current.add(itemId)
+    setMedia((m) => m.filter((x) => x.id !== itemId))
+    setTexts((t) => t.filter((x) => x.id !== itemId))
+    markMediaChanged()
+  }
 
   function setValue(fieldId: string, value: FieldValue) {
     setAnswers((a) => ({ ...a, [fieldId]: value }))
@@ -237,8 +282,13 @@ export default function FamilyForm() {
     )
   }
 
-  const current = familySections[step]
-  const isLast = step === familySections.length - 1
+  // Étapes : les rubriques de la rencontre, avec « Photos, vidéos et textes » après « Photos et supports ».
+  const photosIndex = familySections.findIndex((s) => s.section.id === 'photos')
+  const steps: ({ kind: 'section'; data: (typeof familySections)[number] } | { kind: 'media' })[] = familySections.flatMap(
+    (data, i) => (i === photosIndex ? [{ kind: 'section' as const, data }, { kind: 'media' as const }] : [{ kind: 'section' as const, data }]),
+  )
+  const currentStep = steps[step]
+  const isLast = step === steps.length - 1
   const saveLabel: Record<SaveState, string> = {
     idle: '',
     saving: 'Enregistrement…',
@@ -260,51 +310,66 @@ export default function FamilyForm() {
             onChange={(e) => goTo(Number(e.target.value))}
             className="min-h-11 min-w-0 flex-1 rounded-md border border-line bg-panel px-2 text-sm text-fg"
           >
-            {familySections.map((s, i) => (
-              <option key={s.section.id} value={i}>
-                {i + 1}. {s.section.title}
+            {steps.map((s, i) => (
+              <option key={s.kind === 'media' ? 'media' : s.data.section.id} value={i}>
+                {i + 1}. {s.kind === 'media' ? 'Photos, vidéos et textes' : s.data.section.title}
               </option>
             ))}
           </select>
           <span className="shrink-0 text-xs text-muted">
-            {step + 1} / {familySections.length}
+            {step + 1} / {steps.length}
           </span>
         </div>
         <div className="mt-2 h-1 overflow-hidden rounded-full bg-panel-2">
-          <div className="h-full bg-gold transition-all" style={{ width: `${((step + 1) / familySections.length) * 100}%` }} />
+          <div className="h-full bg-gold transition-all" style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
         </div>
         <p className="mt-1 h-4 text-xs text-muted" aria-live="polite">
           {saveLabel[saveState]}
         </p>
       </div>
 
-      <h1 className="mt-5 font-display text-3xl text-fg">{current.section.title}</h1>
-      <p className="mt-1 text-sm text-muted">{current.section.subtitle}</p>
-
-      <div className="mt-5 space-y-4">
-        {current.fields.map(({ field, label, tip }) => (
-          <MeetingFieldInput
-            key={field.id}
-            field={field}
-            label={label}
-            tip={tip}
-            value={answers[field.id] ?? (field.type === 'chips' ? [] : '')}
-            onChange={(v) => setValue(field.id, v)}
+      {currentStep.kind === 'media' ? (
+        <>
+          <h1 className="mt-5 font-display text-3xl text-fg">Photos, vidéos et textes</h1>
+          <p className="mt-1 text-sm text-muted">
+            Partagez des photos pour le diaporama, une vidéo, un document, ou écrivez un texte à lire pendant la cérémonie.
+          </p>
+          <FamilyMediaStep
+            endpoint={endpoint}
+            linkId={id}
+            linkKey={key}
+            by={name.trim()}
+            media={media}
+            texts={texts}
+            onAddMedia={addMedia}
+            onAddText={addText}
+            onRemove={removeShared}
           />
-        ))}
-      </div>
+        </>
+      ) : (
+        <>
+          <h1 className="mt-5 font-display text-3xl text-fg">{currentStep.data.section.title}</h1>
+          <p className="mt-1 text-sm text-muted">{currentStep.data.section.subtitle}</p>
 
-      {current.section.id === 'photos' && (
-        <div className="mt-4 rounded-lg border border-dashed border-line p-4">
-          <p className="flex items-center justify-between gap-3 text-sm font-medium text-fg">
-            Envoyer vos photos depuis ce téléphone
-            <UnavailableBadge label="Bientôt" />
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            Cette possibilité arrive prochainement. En attendant, l'agence vous indiquera comment lui transmettre vos
-            photos (clé USB, e-mail ou sur place).
-          </p>
-        </div>
+          <div className="mt-5 space-y-4">
+            {currentStep.data.fields.map(({ field, label, tip }) => (
+              <MeetingFieldInput
+                key={field.id}
+                field={field}
+                label={label}
+                tip={tip}
+                value={answers[field.id] ?? (field.type === 'chips' ? [] : '')}
+                onChange={(v) => setValue(field.id, v)}
+              />
+            ))}
+          </div>
+
+          {currentStep.data.section.id === 'photos' && (
+            <p className="mt-4 rounded-lg border border-line p-4 text-sm text-muted">
+              Vos photos et vidéos peuvent être envoyées directement depuis ce téléphone à l'étape suivante.
+            </p>
+          )}
+        </>
       )}
 
       <div className="mt-6 flex gap-3">

@@ -1265,7 +1265,7 @@ export default function CeremonyEditor() {
                 Aucune photo importée pour cette cérémonie pour l'instant.
               </p>
             ) : (
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-6 gap-2 pointer-coarse:grid-cols-4 pointer-coarse:gap-3">
                 {photos.map((p) => {
                   const selected = draft.slideshow.photoIds.includes(p.id)
                   const isFixed = draft.slideshow.fixedPhotoId === p.id
@@ -1279,7 +1279,7 @@ export default function CeremonyEditor() {
                       >
                         <PhotoThumb blob={p.blob} />
                         {selected && (
-                          <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[10px] text-ink">
+                          <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[10px] text-ink pointer-coarse:right-1/2 pointer-coarse:translate-x-1/2">
                             {draft.slideshow.photoIds.indexOf(p.id) + 1}
                           </span>
                         )}
@@ -1294,18 +1294,18 @@ export default function CeremonyEditor() {
                       </button>
                       <button
                         onClick={() => removePhoto(p)}
-                        className="absolute left-1 top-1 hidden rounded-full bg-ink/80 px-1.5 py-0.5 text-xs text-danger group-hover:block"
+                        className="absolute left-1 top-1 hidden rounded-full bg-ink/80 px-1.5 py-0.5 text-xs text-danger group-focus-within:block group-hover:block pointer-coarse:block pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-sm"
                         title="Supprimer cette photo"
                       >
                         ✕
                       </button>
                       <button
                         onClick={() => setEditingPhoto(p)}
-                        className="absolute right-1 top-1 hidden rounded-full bg-ink/80 p-1 text-muted hover:text-gold group-hover:block"
+                        className="absolute right-1 top-1 hidden rounded-full bg-ink/80 p-1 text-muted hover:text-gold group-focus-within:block group-hover:block pointer-coarse:block pointer-coarse:p-2 pointer-coarse:text-gold"
                         title="Retoucher : recadrer, pivoter, régler la lumière…"
                         aria-label={`Retoucher ${p.name}`}
                       >
-                        <Icon name="edit" className="h-3 w-3" />
+                        <Icon name="edit" className="h-3 w-3 pointer-coarse:h-4 pointer-coarse:w-4" />
                       </button>
                       {p.edit && (
                         <span
@@ -1317,12 +1317,12 @@ export default function CeremonyEditor() {
                       )}
                       <button
                         onClick={() => toggleFixedPhoto(p.id)}
-                        className={`absolute bottom-1 right-1 hidden rounded-full bg-ink/80 p-1 group-hover:block ${
+                        className={`absolute bottom-1 right-1 hidden rounded-full bg-ink/80 p-1 group-focus-within:block group-hover:block pointer-coarse:block pointer-coarse:p-2 ${
                           isFixed ? 'text-sky-400' : 'text-muted hover:text-fg'
                         }`}
                         title={isFixed ? 'Retirer comme photo fixe' : 'Définir comme photo fixe'}
                       >
-                        <Icon name="pin" className="h-3 w-3" />
+                        <Icon name="pin" className="h-3 w-3 pointer-coarse:h-4 pointer-coarse:w-4" />
                       </button>
                     </div>
                   )

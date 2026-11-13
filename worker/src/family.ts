@@ -11,6 +11,7 @@
  */
 
 import { readTextCapped, sameSecret } from './secret'
+import { deleteAllFamilyMedia } from './familyMedia'
 
 interface FamilyEnv {
   APP_TOKEN: string
@@ -61,6 +62,13 @@ async function put(env: FamilyEnv, id: string, record: FamilyRecord) {
   await env.RATE_LIMIT.put(key(id), JSON.stringify(record), { expirationTtl: ttl })
 }
 
+/** Date d'expiration d'un espace encore ouvert, sinon null. */
+export async function familyExpiry(env: FamilyEnv, id: string): Promise<number | null> {
+  if (!ID_PATTERN.test(id)) return null
+  const record = await env.RATE_LIMIT.get<FamilyRecord>(key(id), 'json')
+  return record && record.expiresAt > Date.now() ? record.expiresAt : null
+}
+
 export async function handleFamily(request: Request, env: FamilyEnv, id: string, json: Json): Promise<Response> {
   if (!ID_PATTERN.test(id)) return json({ error: 'Lien invalide.' }, 404)
   const hasAppToken = await sameSecret(request.headers.get('X-App-Token'), env.APP_TOKEN)
@@ -96,6 +104,7 @@ export async function handleFamily(request: Request, env: FamilyEnv, id: string,
     case 'DELETE': {
       if (!hasAppToken) return json({ error: "Jeton d'application invalide." }, 401)
       await env.RATE_LIMIT.delete(key(id))
+      await deleteAllFamilyMedia(env, id)
       return json({ ok: true }, 200)
     }
     default:
