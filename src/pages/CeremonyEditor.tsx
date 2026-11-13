@@ -24,6 +24,7 @@ import {
 } from '../lib/videoImport'
 import { convertToPlayableMp4, VideoConvertError, type ConvertProgress } from '../lib/videoConvert'
 import { isPdf, MAX_PDF_PAGES, PdfImportError, pdfToImages } from '../lib/pdfImport'
+import { isImageSizeSafe } from '../lib/imageSize'
 import Icon from '../components/Icon'
 import type {
   Video,
@@ -243,9 +244,14 @@ export default function CeremonyEditor() {
       if (isPdf(file)) {
         const baseName = file.name.replace(/\.pdf$/i, '')
         try {
-          const pages = await pdfToImages(file, (page, total) =>
+          const { images: pages, skipped } = await pdfToImages(file, (page, total) =>
             setPhotoImportStatus(`« ${baseName} » : page ${page} / ${total}`),
           )
+          if (skipped.length) {
+            errors.push(
+              `« ${file.name} » : ${skipped.length > 1 ? `les pages ${skipped.join(', ')} sont illisibles et ont été ignorées` : `la page ${skipped[0]} est illisible et a été ignorée`} ; les autres ont été importées.`,
+            )
+          }
           for (const { blob, page } of pages) {
             await db.photos.add({
               id: newId(),
@@ -271,6 +277,16 @@ export default function CeremonyEditor() {
         } finally {
           setPhotoImportStatus(null)
         }
+        continue
+      }
+      // Seules les images passent, et jamais une « bombe » (dimensions démesurées qui
+      // figeraient le navigateur à l'affichage).
+      if (!file.type.startsWith('image/') || file.type.includes('svg')) {
+        errors.push(`« ${file.name} » n'est pas une photo (JPEG, PNG, WebP, GIF…) : il n'a pas été importé.`)
+        continue
+      }
+      if (!(await isImageSizeSafe(file))) {
+        errors.push(`« ${file.name} » a des dimensions démesurées (plus de 120 millions de pixels) : il n'a pas été importé.`)
         continue
       }
       const photo: Photo = {
