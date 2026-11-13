@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { changePassword, getVerifiedLicense, listAccounts, loadSession } from '../lib/licensing/store'
+import { changePassword, getVerifiedLicense, listAccounts, loadSession, verifyLogin } from '../lib/licensing/store'
 import type { AccountRecord, LicenseRecord } from '../lib/licensing/types'
 import { loadAppSettings, saveAppSettings, type AppSettings } from '../lib/appSettings'
 import { generateSegmentTextAI } from '../lib/aiGeneration'
@@ -265,6 +265,7 @@ export default function Settings() {
             {accounts.length}/{license.seats} identifiant(s) utilisé(s).
           </p>
         )}
+        {license && session && <LicenseKeyReveal token={license.token} username={session.username} />}
         {accounts.length > 0 && (
           <ul className="mb-4 space-y-1 text-sm text-muted">
             {accounts.map((a) => (
@@ -309,6 +310,105 @@ export default function Settings() {
           Mettre à jour
         </button>
       </section>
+    </div>
+  )
+}
+
+/**
+ * Clé d'activation de ce poste, affichée après saisie du mot de passe : quelqu'un devant
+ * un poste resté ouvert ne peut pas la recopier en passant.
+ */
+function LicenseKeyReveal({ token, username }: { token: string; username: string }) {
+  const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
+  const [revealed, setRevealed] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  async function reveal(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (await verifyLogin(username, password)) {
+      setRevealed(true)
+      setPassword('')
+    } else {
+      setError('Mot de passe incorrect.')
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(token)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setError('Copie impossible : sélectionnez la clé et copiez-la manuellement.')
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mb-4 rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold"
+      >
+        Afficher ma clé d'activation
+      </button>
+    )
+  }
+
+  return (
+    <div className="mb-4 rounded-md border border-line bg-panel-2 p-3">
+      {revealed ? (
+        <>
+          <p className="mb-2 text-xs text-muted">Clé d'activation de ce poste :</p>
+          <textarea
+            readOnly
+            value={token}
+            rows={3}
+            onFocus={(e) => e.target.select()}
+            aria-label="Clé d'activation"
+            className="w-full resize-none rounded-md border border-line bg-panel px-2 py-1.5 font-mono text-xs text-fg"
+          />
+          <div className="mt-2 flex gap-2">
+            <button type="button" onClick={copy} className="rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-dim">
+              {copied ? 'Copiée ✓' : 'Copier'}
+            </button>
+            <button
+              type="button"
+              onClick={() => (setRevealed(false), setOpen(false))}
+              className="rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:text-fg"
+            >
+              Masquer
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            Cette clé est personnelle à votre licence. Pour une autre agence, générez-lui sa propre clé.
+          </p>
+        </>
+      ) : (
+        <form onSubmit={reveal} className="flex flex-wrap items-center gap-2">
+          <label htmlFor="license-password" className="text-xs text-muted">
+            Confirmez votre mot de passe :
+          </label>
+          <input
+            id="license-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            className="rounded-md border border-line bg-panel px-2 py-1.5 text-sm text-fg outline-none focus:border-gold-dim"
+          />
+          <button type="submit" className="rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-ink hover:bg-gold-dim">
+            Afficher
+          </button>
+          <button type="button" onClick={() => setOpen(false)} className="text-xs text-muted hover:text-fg">
+            Annuler
+          </button>
+          {error && <p className="w-full text-xs text-danger">{error}</p>}
+        </form>
+      )}
     </div>
   )
 }
