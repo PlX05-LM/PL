@@ -2,8 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import QRCode from 'qrcode'
 import type { Ceremony } from '../types'
+import { db } from '../db'
+import { newId } from '../lib/ids'
 import { isAiConfigured } from '../lib/aiGeneration'
-import { ServiceRequiredNote, UnavailableBadge } from './Unavailable'
+import { downloadFile, formatSize, type FamilyMediaItem } from '../lib/familyMedia'
+import { familyTextSegment } from '../lib/meetingDraft'
+import { isImageSizeSafe } from '../lib/imageSize'
+import { mimeTypeForVideo, probeVideo } from '../lib/videoImport'
+import { ServiceRequiredNote } from './Unavailable'
 import {
   closeInvite,
   countAnswers,
@@ -39,9 +45,8 @@ function PaperAndPhotos({ ceremonyId }: { ceremonyId: string }) {
       >
         Version papier à imprimer
       </Link>
-      <p className="flex items-start justify-between gap-2 text-xs leading-relaxed text-muted">
-        <span>Envoi des photos du diaporama par la famille, depuis son téléphone.</span>
-        <UnavailableBadge label="Bientôt" />
+      <p className="text-xs leading-relaxed text-muted">
+        La famille peut aussi envoyer depuis son téléphone des photos, des vidéos, des documents et des textes.
       </p>
     </div>
   )
@@ -65,6 +70,8 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
   const [notice, setNotice] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [qr, setQr] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [progress, setProgress] = useState<string | null>(null)
   const serviceReady = useMemo(() => isAiConfigured(), [])
 
   const refresh = useCallback(async () => {
@@ -111,11 +118,91 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
     setBusy(false)
   }
 
-  function handleImport() {
-    if (!active || !remote) return
-    const { ceremony: next, changed } = importFamilyAnswers(ceremony, remote.payload)
-    onChange({ ...next, familyInvite: { ...active, importedUpdatedAt: remote.updatedAt } })
-    setNotice(changed ? `${changed} rubrique${changed > 1 ? 's' : ''} complétée${changed > 1 ? 's' : ''} par la famille.` : 'Rien de nouveau à importer.')
+  async function handleImport() {
+    if (!active || !remote || importing) return
+    setImporting(true)
+    setNotice(null)
+    const done: string[] = []
+    try {
+      // 1. Réponses du formulaire.
+      const { ceremony: withAnswers, changed } = importFamilyAnswers(ceremony, remote.payload)
+      let next = withAnswers
+      if (changed) done.push(`${changed} rubrique${changed > 1 ? 's' : ''} complétée${changed > 1 ? 's' : ''}`)
+
+      // 2. Textes écrits par les proches : gardés avec la rencontre, et ajoutés au déroulé
+      //    s'il existe déjà (sinon ils y entreront à la validation de la rencontre).
+      const knownTexts = new Set((next.meeting?.familyTexts ?? []).map((t) => t.id))
+      const newTexts = remote.payload.texts.filter((t) => !knownTexts.has(t.id))
+      if (newTexts.length) {
+        const records = newTexts.map(({ id, title, body, by }) => ({ id, title, body, by }))
+        next = {
+          ...next,
+          meeting: { answers: next.meeting?.answers ?? {}, ...next.meeting, familyTexts: [...(next.meeting?.familyTexts ?? []), ...records] },
+          segments: next.segments.length ? [...next.segments, ...records.map(familyTextSegment)] : next.segments,
+        }
+        done.push(`${newTexts.length} texte${newTexts.length > 1 ? 's' : ''}`)
+      }
+
+      // 3. Photos et vidéos : récupérées, déchiffrées et ajoutées à la cérémonie.
+      const imported = new Set(active.importedMediaIds ?? [])
+      const toImport = remote.payload.media.filter((m) => m.kind !== 'document' && !imported.has(m.id))
+      let photos = 0
+      let videos = 0
+      for (const [i, item] of toImport.entries()) {
+        setProgress(`Récupération ${i + 1} / ${toImport.length} : « ${item.name} »`)
+        try {
+          const blob = await downloadFile(active.endpoint, active.id, active.key, item)
+          if (item.kind === 'photo') {
+            if (!(await isImageSizeSafe(blob))) continue
+            await db.photos.add({ id: newId(), name: item.name.replace(/\.[^.]+$/, ''), blob, mimeType: 'image/jpeg', createdAt: Date.now() + i, ceremonyId: ceremony.id })
+            photos++
+          } else {
+            const file = new File([blob], item.name, { type: item.type })
+            const probe = await probeVideo(file).catch(() => undefined)
+            await db.videos.add({
+              id: newId(),
+              name: item.name.replace(/\.[^.]+$/, ''),
+              blob: file,
+              mimeType: mimeTypeForVideo(file),
+              ...probe,
+              createdAt: Date.now() + i,
+              ceremonyId: ceremony.id,
+            })
+            videos++
+          }
+          imported.add(item.id)
+        } catch {
+          // Fichier retiré entre-temps ou réseau coupé : il sera repris au prochain import.
+        }
+      }
+      if (photos) done.push(`${photos} photo${photos > 1 ? 's' : ''}`)
+      if (videos) done.push(`${videos} vidéo${videos > 1 ? 's' : ''}`)
+
+      onChange({ ...next, familyInvite: { ...active, importedUpdatedAt: remote.updatedAt, importedMediaIds: [...imported] } })
+      const missing = toImport.length - photos - videos
+      setNotice(
+        (done.length ? `Ajouté au dossier : ${done.join(', ')}.` : 'Rien de nouveau à importer.') +
+          (missing > 0 ? ` ${missing} fichier${missing > 1 ? 's' : ''} n'a pas pu être récupéré : relancez l'import.` : ''),
+      )
+    } finally {
+      setProgress(null)
+      setImporting(false)
+    }
+  }
+
+  async function saveDocument(item: FamilyMediaItem) {
+    if (!active) return
+    try {
+      const blob = await downloadFile(active.endpoint, active.id, active.key, item)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = item.name
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    } catch {
+      setError(`« ${item.name} » n'a pas pu être récupéré.`)
+    }
   }
 
   if (!active) {
@@ -168,7 +255,21 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
     name ? ` à ${name}` : ''
   }. Remplissez ce que vous souhaitez, à votre rythme, et partagez-le avec vos proches si vous le voulez. Lien confidentiel, valable jusqu'au ${formatDay(active.expiresAt)} : ${url}`
   const answered = remote ? countAnswers(remote.payload) : 0
-  const hasNew = remote && remote.updatedAt > (active.importedUpdatedAt ?? 0)
+  const importedMedia = new Set(active.importedMediaIds ?? [])
+  const knownTexts = new Set((ceremony.meeting?.familyTexts ?? []).map((t) => t.id))
+  const pendingMedia = remote ? remote.payload.media.filter((m) => m.kind !== 'document' && !importedMedia.has(m.id)) : []
+  const pendingTexts = remote ? remote.payload.texts.filter((t) => !knownTexts.has(t.id)) : []
+  const documents = remote ? remote.payload.media.filter((m) => m.kind === 'document') : []
+  const hasNew = Boolean(remote && (remote.updatedAt > (active.importedUpdatedAt ?? 0) || pendingMedia.length || pendingTexts.length))
+  const count = (kind: FamilyMediaItem['kind']) => remote?.payload.media.filter((m) => m.kind === kind).length ?? 0
+  const shared = [
+    [count('photo'), 'photo'],
+    [count('video'), 'vidéo'],
+    [remote?.payload.texts.length ?? 0, 'texte'],
+    [count('document'), 'document'],
+  ]
+    .filter(([n]) => (n as number) > 0)
+    .map(([n, label]) => `${n} ${label}${(n as number) > 1 ? 's' : ''}`)
 
   async function toggleQr() {
     if (qr) return setQr(null)
@@ -232,6 +333,7 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
           <>
             <p className="text-fg">
               {answered} réponse{answered > 1 ? 's' : ''}
+              {shared.length > 0 && ` · ${shared.join(', ')}`}
             </p>
             <p className="mt-0.5 text-xs text-muted">
               Dernière saisie {formatAgo(remote.updatedAt)}
@@ -245,14 +347,37 @@ export default function FamilyInvitePanel({ ceremony, onChange }: { ceremony: Ce
       <button
         type="button"
         onClick={handleImport}
-        disabled={!hasNew}
+        disabled={!hasNew || importing}
         className="mt-3 min-h-11 w-full rounded-md bg-gold px-3 text-sm font-medium text-ink hover:bg-gold-dim disabled:opacity-40"
       >
-        {hasNew ? 'Importer les réponses de la famille' : 'Réponses à jour'}
+        {importing ? 'Import en cours…' : hasNew ? 'Importer les envois de la famille' : 'Tout est importé'}
       </button>
+      {progress && (
+        <p className="mt-2 text-xs text-gold" aria-live="polite">
+          {progress}
+        </p>
+      )}
       {notice && <p className="mt-2 text-xs text-gold">{notice}</p>}
+      {documents.length > 0 && (
+        <div className="mt-3">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">Documents reçus</p>
+          <ul className="space-y-1">
+            {documents.map((d) => (
+              <li key={d.id} className="flex items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 truncate text-fg" title={d.name}>
+                  {d.name} <span className="text-muted">({formatSize(d.size)})</span>
+                </span>
+                <button type="button" onClick={() => saveDocument(d)} className="shrink-0 text-gold hover:text-fg">
+                  Télécharger
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="mt-2 text-xs leading-relaxed text-muted">
-        L'import complète le dossier sans rien effacer : un texte différent du vôtre est ajouté à la suite.
+        L'import complète le dossier sans rien effacer : photos et vidéos rejoignent la cérémonie, les textes deviennent
+        des étapes du déroulé, et une réponse différente de la vôtre est ajoutée à la suite.
       </p>
 
       <div className="mt-3 flex gap-2">

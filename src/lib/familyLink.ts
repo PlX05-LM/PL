@@ -1,6 +1,8 @@
 import type { Ceremony, FamilyInvite, MeetingAnswers } from '../types'
 import { loadAppSettings } from './appSettings'
 import { isSafeEndpoint } from './endpoint'
+import { fromB64url, importFamilyKey as importKey, toB64url } from './familyCrypto'
+import { sanitizeMedia, sanitizeTexts, type FamilyMediaItem, type FamilyText } from './familyMedia'
 import { meetingSections, readField, writeField, type FieldValue, type MeetingField, type MeetingSection } from './meetingGuide'
 
 /**
@@ -19,6 +21,10 @@ export interface FamilyPayload {
   /** La famille a indiqué avoir terminé. */
   finishedAt?: number
   updatedAt: number
+  /** Photos, vidéos et documents déposés (les fichiers eux-mêmes sont stockés à part, chiffrés). */
+  media: FamilyMediaItem[]
+  /** Textes écrits par les proches : discours, poème, message à lire. */
+  texts: FamilyText[]
 }
 
 // --- Ce que voit la famille ------------------------------------------------
@@ -77,7 +83,7 @@ export function initialPayload(c: Ceremony): FamilyPayload {
     const v = readField(c, f)
     if (!isEmpty(f, v)) answers[f.id] = v
   }
-  return { v: 1, deceasedName: c.deceasedName.trim(), answers, contributors: [], updatedAt: Date.now() }
+  return { v: 1, deceasedName: c.deceasedName.trim(), answers, contributors: [], updatedAt: Date.now(), media: [], texts: [] }
 }
 
 /** Nombre de champs que la famille a renseignés. */
@@ -122,24 +128,6 @@ export function importFamilyAnswers(c: Ceremony, p: FamilyPayload): { ceremony: 
 
 // --- Chiffrement -----------------------------------------------------------
 
-function toB64url(bytes: Uint8Array): string {
-  let bin = ''
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function fromB64url(text: string): Uint8Array<ArrayBuffer> {
-  const b64 = text.replace(/-/g, '+').replace(/_/g, '/')
-  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))
-  const out = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
-  return out
-}
-
-function importKey(key: string) {
-  return crypto.subtle.importKey('raw', fromB64url(key), 'AES-GCM', false, ['encrypt', 'decrypt'])
-}
-
 async function encrypt(payload: FamilyPayload, key: string) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await importKey(key), new TextEncoder().encode(JSON.stringify(payload)))
@@ -178,7 +166,16 @@ export function sanitizePayload(raw: unknown): FamilyPayload {
     : []
   const finishedAt = typeof p.finishedAt === 'number' && Number.isFinite(p.finishedAt) ? p.finishedAt : undefined
   const updatedAt = typeof p.updatedAt === 'number' && Number.isFinite(p.updatedAt) ? p.updatedAt : 0
-  return { v: 1, deceasedName: clip(p.deceasedName, 200), answers, contributors, finishedAt, updatedAt }
+  return {
+    v: 1,
+    deceasedName: clip(p.deceasedName, 200),
+    answers,
+    contributors,
+    finishedAt,
+    updatedAt,
+    media: sanitizeMedia(p.media),
+    texts: sanitizeTexts(p.texts),
+  }
 }
 
 

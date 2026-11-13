@@ -15,9 +15,15 @@ export async function sameSecret(given: string | null, expected: string | undefi
  * au lieu d'être lue en entier. Renvoie null si elle est trop grosse.
  */
 export async function readTextCapped(request: Request, maxBytes: number): Promise<string | null> {
+  const bytes = await readBytesCapped(request, maxBytes)
+  return bytes === null ? null : new TextDecoder().decode(bytes)
+}
+
+/** Même lecture bornée, pour un contenu binaire (morceau de fichier chiffré). */
+export async function readBytesCapped(request: Request, maxBytes: number): Promise<Uint8Array | null> {
   const declared = Number(request.headers.get('Content-Length') ?? '0')
   if (declared > maxBytes) return null
-  if (!request.body) return ''
+  if (!request.body) return new Uint8Array(0)
   const reader = request.body.getReader()
   const chunks: Uint8Array[] = []
   let total = 0
@@ -37,5 +43,5 @@ export async function readTextCapped(request: Request, maxBytes: number): Promis
     all.set(c, offset)
     offset += c.byteLength
   }
-  return new TextDecoder().decode(all)
+  return all
 }

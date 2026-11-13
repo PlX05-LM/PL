@@ -14,10 +14,6 @@ import { isAiConfigured } from '../lib/aiGeneration'
 /** Annoncées aux agences, pas encore disponibles. */
 const comingSoon = [
   {
-    title: 'Photos envoyées par la famille',
-    description: 'Les proches déposent leurs photos depuis leur téléphone, via le lien famille ; le diaporama se construit sans clé USB.',
-  },
-  {
     title: 'Coffret souvenir numérique',
     description: "Après la cérémonie, un espace privé pour la famille : textes lus, musiques, diaporama, film de l'hommage.",
   },

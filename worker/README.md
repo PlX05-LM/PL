@@ -106,6 +106,12 @@ une écriture dans l'espace de stockage, et l'offre gratuite en autorise 1 000 p
 d'écritures par famille). Au-delà d'une dizaine de familles actives par jour, passez au
 forfait Workers Paid (5 $/mois, un million d'écritures par mois).
 
+**Photos et vidéos envoyées par la famille** : elles sont stockées (chiffrées) dans le
+même espace, en morceaux de 20 Mo, 600 Mo au plus par lien, et effacées à la fermeture
+ou à l'expiration du lien. L'offre gratuite plafonne le stockage total à 1 Go : quelques
+familles qui envoient des vidéos en même temps suffisent à l'atteindre. Pour un usage
+réel, passez à Workers Paid (stockage inclus puis 0,50 $/Go/mois).
+
 ## Protection contre les abus
 
 Deux garde-fous sont en place :

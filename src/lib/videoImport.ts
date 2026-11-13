@@ -25,14 +25,15 @@ export function probeVideo(file: Blob): Promise<VideoProbe> {
       URL.revokeObjectURL(url)
       fn()
     }
-    video.onloadedmetadata = () =>
-      done(() =>
-        resolve({
-          duration: Number.isFinite(video.duration) ? video.duration : undefined,
-          width: video.videoWidth || undefined,
-          height: video.videoHeight || undefined,
-        }),
-      )
+    video.onloadedmetadata = () => {
+      // Relevé avant `done`, qui vide la vidéo (sa durée et ses dimensions retombent à zéro).
+      const probe: VideoProbe = {
+        duration: Number.isFinite(video.duration) ? video.duration : undefined,
+        width: video.videoWidth || undefined,
+        height: video.videoHeight || undefined,
+      }
+      done(() => resolve(probe))
+    }
     video.onerror = () => done(() => reject(new Error('unsupported')))
     const timer = setTimeout(() => done(() => reject(new Error('timeout'))), 20000)
     video.src = url

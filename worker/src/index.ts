@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { handleFamily } from './family'
+import { familyExpiry, handleFamily } from './family'
+import { handleFamilyMedia } from './familyMedia'
 import { readTextCapped, sameSecret } from './secret'
 
 export interface Env {
@@ -247,6 +248,21 @@ export default {
 
     // Lien famille : accessible sans jeton d'application (le lien lui-même fait office
     // d'accès), sauf pour créer ou fermer un espace — voir family.ts.
+    // Fichiers déposés par la famille : même règle d'accès que l'espace, et seulement
+    // tant que celui-ci est ouvert.
+    const mediaMatch = url.pathname.match(/^\/family\/([^/]+)\/media\/([^/]+)(?:\/([0-9]+))?$/)
+    if (mediaMatch) {
+      try {
+        const [, id, file, chunk] = mediaMatch
+        return await handleFamilyMedia(request, env, id, file, chunk, await familyExpiry(env, id), headers, (data, status) =>
+          json(data, status, headers),
+        )
+      } catch (err) {
+        console.error('family-media', err)
+        return json({ error: 'Le service est momentanément indisponible.' }, 503, headers)
+      }
+    }
+
     const familyMatch = url.pathname.match(/^\/family\/([^/]+)$/)
     if (familyMatch) {
       try {

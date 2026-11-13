@@ -230,6 +230,8 @@ export interface FamilyInvite {
   closedAt?: number
   /** Dernière date (côté famille) déjà importée dans le dossier. */
   importedUpdatedAt?: number
+  /** Fichiers déposés par la famille déjà ajoutés à la cérémonie. */
+  importedMediaIds?: string[]
 }
 
 /**
@@ -238,8 +240,18 @@ export interface FamilyInvite {
  */
 export type MeetingAnswers = Record<string, string | string[]>
 
+/** Texte écrit par un proche via le lien famille (discours, poème, message). */
+export interface FamilyTextRecord {
+  id: string
+  title: string
+  body: string
+  by: string
+}
+
 export interface FamilyMeeting {
   answers: MeetingAnswers
+  /** Textes reçus par le lien famille : ils deviennent des étapes du déroulé. */
+  familyTexts?: FamilyTextRecord[]
   /** Rencontre validée : le dossier passe en conception. */
   completedAt?: number
 }
