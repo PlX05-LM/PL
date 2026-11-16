@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
-import type { Ceremony } from '../types'
+import { createEmptyBiography, type Biography, type Ceremony } from '../types'
 import { useDebouncedCallback } from '../lib/useDebouncedEffect'
 import {
   meetingProgress,
@@ -288,6 +288,28 @@ export default function Meeting() {
               Relisez le résumé avec la famille et faites épeler les prénoms. La validation rédige tous les textes
               du déroulé et ouvre la conception.
             </p>
+            {draft.biography?.gender !== 'femme' && draft.biography?.gender !== 'homme' && (
+              <div className="mt-3 rounded-md border border-gold-dim/60 bg-panel-2 p-3">
+                <p className="text-xs leading-relaxed text-fg">
+                  Le défunt est-il une femme ou un homme ? Sans cette réponse, les textes à lire gardent des formes
+                  comme « il/elle ».
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {([['femme', 'Une femme'], ['homme', 'Un homme']] as [Biography['gender'], string][]).map(([g, label]) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() =>
+                        applyCeremony({ ...draft, biography: { ...(draft.biography ?? createEmptyBiography()), gender: g } })
+                      }
+                      className="min-h-11 rounded-md border border-line text-sm text-fg hover:border-gold-dim"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button
               type="button"
               onClick={handleValidate}
