@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import type { MeetingAnswers } from '../types'
 import { fetchFamily, FamilyLinkError, familySections, isSafeEndpoint, saveFamily, type FamilyPayload } from '../lib/familyLink'
 import type { FieldValue } from '../lib/meetingGuide'
@@ -255,8 +255,15 @@ export default function FamilyForm() {
           </p>
           <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted">
             <Icon name="lock" className="mt-0.5 h-4 w-4 shrink-0 text-gold-dim" />
-            Vos réponses sont chiffrées et ne sont lisibles que par l'agence. Elles sont effacées
-            automatiquement{until ? ` après le ${until}` : ''}.
+            <span>
+              Vos réponses et vos fichiers sont chiffrés sur ce téléphone et ne sont lisibles que par l'agence, qui
+              s'en sert uniquement pour préparer la cérémonie. Ils sont effacés du service en ligne dès que l'agence ferme
+              l'accès, et au plus tard{until ? ` le ${until}` : ' à la fin de l’accès'}. L'agence peut s'aider
+              d'une intelligence artificielle pour mettre vos souvenirs en phrases.{' '}
+              <Link to="/legal/confidentialite" className="text-gold underline">
+                Vos données et vos droits
+              </Link>
+            </span>
           </p>
         </div>
         <div className="rounded-lg border border-line bg-panel p-4">

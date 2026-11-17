@@ -3,6 +3,8 @@ export interface LicensePayload {
   seats: number
   issuedAt: number
   id: string
+  /** Fin de l'abonnement (ms) ; absent = licence sans date de fin. */
+  expiresAt?: number
 }
 
 export interface LicenseRecord {
@@ -11,6 +13,8 @@ export interface LicenseRecord {
   customer: string
   seats: number
   activatedAt: number
+  /** Fin de l'abonnement, lue dans la clé signée. */
+  expiresAt?: number
 }
 
 export interface AccountRecord {

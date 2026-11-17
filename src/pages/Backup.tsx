@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { BackupStats } from '../lib/backup'
 import BackButton from '../components/BackButton'
+import AutoBackupPanel from '../components/AutoBackupPanel'
 
 export default function Backup() {
   const fileInput = useRef<HTMLInputElement>(null)
@@ -94,6 +95,8 @@ export default function Backup() {
           {message.text}
         </div>
       )}
+
+      <AutoBackupPanel />
 
       <div className="mt-6 rounded-lg border border-line bg-panel p-5">
         <h3 className="font-display text-lg text-fg">Télécharger une sauvegarde complète</h3>

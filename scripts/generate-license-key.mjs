@@ -4,8 +4,10 @@
 // ECDSA P-256, puis signe une clé d'activation par client.
 //
 // Usage :
-//   node scripts/generate-license-key.mjs "Pompes Funèbres Dupont" 3
-//   (nom du client, puis nombre de postes/identifiants inclus — 1 par défaut)
+//   node scripts/generate-license-key.mjs "Pompes Funèbres Dupont" 3 12
+//   (nom du client, nombre de postes/identifiants inclus — 1 par défaut —, puis durée de
+//   l'abonnement en mois ; sans durée, la clé n'expire jamais. À chaque renouvellement,
+//   générez une nouvelle clé et envoyez-la au client.)
 //
 // La clé privée (license-private-key.json) est générée à côté de ce script
 // si elle n'existe pas encore, et n'est JAMAIS committée (voir .gitignore).
@@ -71,7 +73,7 @@ export const PUBLIC_KEY_JWK: JsonWebKey | null = ${JSON.stringify(publicJwk, nul
 }
 
 async function main() {
-  const [, , customer, seatsArg] = process.argv
+  const [, , customer, seatsArg, monthsArg] = process.argv
   if (!customer) {
     console.error('Usage : node scripts/generate-license-key.mjs "Nom du client" [nombre de postes]')
     process.exitCode = 1
@@ -84,15 +86,34 @@ async function main() {
     return
   }
 
+  const months = monthsArg ? parseInt(monthsArg, 10) : null
+  if (months !== null && (!Number.isInteger(months) || months < 1 || months > 60)) {
+    console.error("La durée de l'abonnement doit être un nombre de mois entre 1 et 60.")
+    process.exitCode = 1
+    return
+  }
+
   const privateKey = await ensureKeyPair()
 
-  const payload = { customer, seats, issuedAt: Date.now(), id: randomUUID() }
+  const issuedAt = Date.now()
+  const payload = { customer, seats, issuedAt, id: randomUUID() }
+  if (months) {
+    const end = new Date(issuedAt)
+    end.setMonth(end.getMonth() + months)
+    end.setHours(23, 59, 59, 0)
+    payload.expiresAt = end.getTime()
+  }
   const payloadBytes = new TextEncoder().encode(JSON.stringify(payload))
   const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privateKey, payloadBytes)
   const token = `CEREO-${bytesToBase64Url(payloadBytes)}.${bytesToBase64Url(new Uint8Array(signature))}`
 
   console.log('Client :', customer)
   console.log('Postes (identifiants possibles sous cette licence) :', seats)
+  console.log(
+    'Fin de l\'abonnement :',
+    payload.expiresAt ? new Date(payload.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : 'aucune',
+  )
+  console.log('Identifiant de licence (pour la suspendre si besoin) :', payload.id)
   console.log('')
   console.log("Clé d'activation à transmettre au client :")
   console.log('')

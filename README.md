@@ -69,57 +69,57 @@ automatiquement l'application sur GitHub Pages à chaque push. L'appli est servi
 Si Pages n'est pas encore activé sur le dépôt, une seule manipulation ponctuelle est
 nécessaire : Settings → Pages → Build and deployment → Source → **GitHub Actions**.
 
-## Licences et activation
+## Licences, abonnements et service en ligne
 
-L'application est verrouillée par une clé d'activation cryptographiquement
-signée (ECDSA P-256) — pas de serveur, pas d'abonnement à héberger : la
-vérification se fait entièrement dans le navigateur du client, hors-ligne
-comme le reste de l'app.
+L'application est verrouillée par une clé d'activation signée (ECDSA P-256),
+vérifiée dans le navigateur, hors-ligne. Cette même clé ouvre l'accès au service
+en ligne (IA et lien famille) : **rien à régler sur le poste du client**.
 
-Pour vendre une licence à un client :
+Pour un nouveau client, ou à chaque renouvellement :
 
 ```bash
-node scripts/generate-license-key.mjs "Pompes Funèbres Dupont" 3
+node scripts/generate-license-key.mjs "Pompes Funèbres Dupont" 3 12
 ```
 
-(nom du client, puis nombre de postes/identifiants inclus dans la licence —
-1 par défaut). La première exécution génère une paire de clés :
-- `license-private-key.json` — la clé privée, créée à la racine du projet et
-  **jamais committée** (dans `.gitignore`). C'est elle qui permet de signer
-  de nouvelles clés d'activation : à conserver précieusement, en dehors du
-  dépôt (elle n'a été communiquée qu'une fois, lors de la création).
-- la clé publique correspondante, intégrée dans
-  `src/lib/licensing/publicKey.ts` et committée normalement — elle ne permet
-  que de *vérifier* une clé, jamais d'en fabriquer.
+(nom du client, nombre de postes, puis durée de l'abonnement en mois ; sans
+durée, la clé n'expire jamais). Le script affiche la clé à envoyer, la date de
+fin et l'identifiant de la licence.
 
-Le script affiche ensuite la clé d'activation à transmettre au client. Celui-ci
-la saisit une fois dans l'application, puis choisit son identifiant et son mot
-de passe (stockés localement, mot de passe jamais en clair). Si la licence
-inclut plusieurs postes, chaque personne de l'agence peut créer son propre
-identifiant depuis l'écran de connexion, jusqu'à la limite achetée.
+- `license-private-key.json`, créée à la racine à la première exécution, n'est
+  **jamais committée** : elle seule fabrique des clés. À garder hors du dépôt.
+- La clé publique est dans `src/lib/licensing/publicKey.ts` et, pour le service,
+  dans `worker/src/license.ts` : les deux doivent rester identiques.
 
-## Génération de texte par IA (optionnelle)
+**Fin d'abonnement** : 15 jours avant, l'accueil prévient. À la date de fin, le
+logiciel se bloque mais propose toujours de télécharger une sauvegarde complète ;
+la nouvelle clé reçue au renouvellement le débloque, dossiers intacts. Le service
+en ligne refuse aussi une clé expirée.
 
-Céréo reste par défaut un logiciel 100% local et hors-ligne — l'IA n'est qu'une
-option, jamais un passage obligé. Pour l'activer :
+**Suspendre une licence** (impayé, clé diffusée) : voir `worker/README.md`,
+« Protection contre les abus ».
 
-1. Déployez le service fourni dans le dossier [`worker/`](./worker) (un « worker »
-   Cloudflare qui appelle l'API Claude avec votre propre clé — voir
-   [`worker/README.md`](./worker/README.md) pour le guide de déploiement complet,
-   les coûts, et la protection contre les abus).
-2. Dans l'application, **Paramètres → Génération de texte par IA**, renseignez
-   l'adresse du service obtenue à l'étape précédente et le jeton d'application
-   choisi lors du déploiement, puis testez la connexion.
+**Quota d'IA** : 150 rédactions par mois et par poste (réglable), décomptées par
+licence ; une rédaction qui échoue n'est pas décomptée. Coût indicatif : moins
+de 0,15 $ par rédaction.
 
-Une fois configurée, un bouton « 🤖 Générer avec l'IA » apparaît à côté du
-générateur local sur la page Biographie et sur chaque étape du déroulé. Cette
-option nécessite une connexion internet ; sans elle (par exemple en cimetière
-hors réseau), l'application l'indique clairement et le générateur local sans IA
-reste toujours utilisable en secours.
+## Sauvegarde et protection des données
 
-**Confidentialité** : seules les informations que vous saisissez sont envoyées
-au service, uniquement au moment de cliquer sur « Générer » — rien n'est envoyé
-automatiquement ni en arrière-plan.
+- Céréo demande au navigateur de ne jamais effacer ses données de lui-même.
+- **Sauvegarde automatique** (Chrome et Edge sur ordinateur) : chaque jour, une
+  copie complète dans un dossier choisi par l'agence (idéalement un dossier
+  synchronisé OneDrive / Google Drive / Dropbox), 10 dernières gardées.
+- Ailleurs (iPad, Safari), l'accueil rappelle de télécharger une sauvegarde dès
+  qu'elle date de plus de 7 jours.
+
+## Textes juridiques
+
+Confidentialité, mentions légales, conditions générales et contrat de
+sous-traitance : `src/legal/texts.ts`, publics sur `#/legal/...` et liés depuis
+l'écran d'activation, les Paramètres et le formulaire famille. Les informations
+de la société sont à compléter dans `src/legal/editor.ts` (champs entre
+crochets, adresse e-mail de contact qui fait aussi apparaître « Demander un essai
+gratuit »). **Projets à faire relire par un juriste** : passer `draft` à `false`
+ensuite.
 
 ## Stack technique
 

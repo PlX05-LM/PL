@@ -10,6 +10,8 @@ import DossierSteps from '../components/DossierSteps'
 import Icon, { type IconName } from '../components/Icon'
 import { ComingSoonCard, UnavailableBadge } from '../components/Unavailable'
 import { isAiConfigured } from '../lib/aiGeneration'
+import BackupReminder from '../components/BackupReminder'
+import LicenseNotice from '../components/LicenseNotice'
 
 /** Annoncées aux agences, pas encore disponibles. */
 const comingSoon = [
@@ -25,10 +27,7 @@ const comingSoon = [
     title: 'Livret souvenir imprimé',
     description: "Photos, textes et messages du livre d'or réunis dans un livret à commander pour la famille.",
   },
-  {
-    title: "Suivi de l'IA par agence",
-    description: "Consommation de l'IA par licence, accès coupé automatiquement à la fin d'un abonnement.",
-  },
+
 ]
 
 function formatWhen(c: Ceremony) {
@@ -129,11 +128,14 @@ export default function Home() {
         </button>
       </div>
 
+      <LicenseNotice />
+      <BackupReminder />
+
       {!serviceReady && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel px-5 py-3 text-sm">
           <p className="flex flex-wrap items-center gap-2 text-muted">
             <UnavailableBadge />
-            Service en ligne non configuré sur ce poste : rédaction par IA et lien famille indisponibles. Le reste
+            Service en ligne indisponible sur ce poste : rédaction par IA et lien famille désactivés. Le reste
             fonctionne normalement.
           </p>
           <Link to="/parametres" className="font-medium text-gold hover:text-fg">

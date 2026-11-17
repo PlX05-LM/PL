@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useInstallPrompt } from '../lib/useInstallPrompt'
 import { clearSession, loadSession } from '../lib/licensing/store'
@@ -22,6 +23,17 @@ function handleLogout() {
 export default function AppShell() {
   const { canInstall, showIosHint, promptInstall } = useInstallPrompt()
   const session = loadSession()
+
+  // Protection du stockage et sauvegarde automatique quotidienne (si un dossier est choisi).
+  useEffect(() => {
+    const tick = () =>
+      import('../lib/autoBackup')
+        .then((m) => m.protectStorage().then(() => m.runAutoBackup()))
+        .catch(() => {})
+    tick()
+    const timer = setInterval(tick, 3 * 3_600_000)
+    return () => clearInterval(timer)
+  }, [])
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-ink text-fg">

@@ -119,7 +119,34 @@ export async function getLibraryStats(): Promise<BackupStats> {
   return { ceremonies, tracks, photos, videos }
 }
 
-export async function exportFullBackup(): Promise<BackupStats> {
+export interface BuiltBackup {
+  blob: Blob
+  filename: string
+  stats: BackupStats
+}
+
+const LAST_BACKUP_KEY = 'cereo-last-backup-v1'
+
+/** Date de la dernière sauvegarde réussie sur ce poste (téléchargée ou automatique). */
+export function lastBackupAt(): number | null {
+  try {
+    const v = Number(localStorage.getItem(LAST_BACKUP_KEY))
+    return Number.isFinite(v) && v > 0 ? v : null
+  } catch {
+    return null
+  }
+}
+
+export function markBackupDone(at = Date.now()) {
+  try {
+    localStorage.setItem(LAST_BACKUP_KEY, String(at))
+  } catch {
+    // stockage indisponible : le rappel de sauvegarde restera affiché.
+  }
+}
+
+/** Fabrique l'archive complète (dossiers, musiques, photos, vidéos), sans la télécharger. */
+export async function buildFullBackup(): Promise<BuiltBackup> {
   const [ceremonies, tracks, photos, videos] = await Promise.all([
     db.ceremonies.toArray(),
     db.tracks.toArray(),
@@ -165,22 +192,27 @@ export async function exportFullBackup(): Promise<BackupStats> {
   zip.file('backup.json', JSON.stringify(manifest, null, 2))
 
   const blob = await zip.generateAsync({ type: 'blob' })
+  const dateStr = new Date().toISOString().slice(0, 10)
+  return {
+    blob,
+    filename: `${toSafeFilename('Cereo-sauvegarde')}-${dateStr}.zip`,
+    stats: { ceremonies: ceremonies.length, tracks: tracks.length, photos: photos.length, videos: videos.length },
+  }
+}
+
+/** Télécharge une sauvegarde complète. */
+export async function exportFullBackup(): Promise<BackupStats> {
+  const { blob, filename, stats } = await buildFullBackup()
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  const dateStr = new Date().toISOString().slice(0, 10)
-  a.download = `${toSafeFilename('Cereo-sauvegarde')}-${dateStr}.zip`
+  a.download = filename
   document.body.appendChild(a)
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
-
-  return {
-    ceremonies: ceremonies.length,
-    tracks: tracks.length,
-    photos: photos.length,
-    videos: videos.length,
-  }
+  markBackupDone()
+  return stats
 }
 
 export async function importFullBackup(file: File): Promise<BackupStats> {

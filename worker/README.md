@@ -114,17 +114,24 @@ réel, passez à Workers Paid (stockage inclus puis 0,50 $/Go/mois).
 
 ## Protection contre les abus
 
-Deux garde-fous sont en place :
-- **Jeton d'application** (`APP_TOKEN`) : toute requête sans le bon jeton est
-  rejetée avant d'atteindre l'API Anthropic.
-- **Limite de requêtes par adresse IP** (`RATE_LIMIT_PER_HOUR`, 30/heure par
-  défaut) : réglable dans `wrangler.toml` (section `[vars]`, à ajouter si
-  besoin) ou via `npx wrangler secret put RATE_LIMIT_PER_HOUR`.
+- **Accès par licence** : chaque poste envoie sa clé d'activation, dont le
+  service vérifie la signature (clé publique dans `src/license.ts`). Une clé
+  bricolée, modifiée ou expirée est refusée avant d'atteindre l'API Anthropic.
+- **Quota par licence** : `LICENSE_MONTHLY_AI_LIMIT` rédactions par mois et par
+  poste (150 par défaut) ; les échecs ne sont pas décomptés.
+- **Suspendre une licence** (impayé, clé diffusée) avec son identifiant, affiché
+  à la génération de la clé :
 
-Ces garde-fous limitent l'exposition mais ne remplacent pas une vraie
-authentification par utilisateur — à surveiller si l'usage grandit
-(consultez le tableau de bord Cloudflare et la page d'usage Anthropic
-régulièrement).
+  ```bash
+  npx wrangler kv key put --binding RATE_LIMIT "lic-revoked:<identifiant>" 1 --remote
+  ```
+
+  Pour la rétablir : `npx wrangler kv key delete --binding RATE_LIMIT "lic-revoked:<identifiant>" --remote`.
+- **Jeton d'application** (`APP_TOKEN`) : accès de l'éditeur (service personnel,
+  compatibilité avec les anciennes installations).
+- **Limites globales** : `RATE_LIMIT_PER_HOUR` par adresse IP (30 par défaut) et
+  `DAILY_AI_LIMIT` toutes licences confondues (2000 par jour par défaut), filet de
+  sécurité de la facture.
 
 ## Origines autorisées (CORS)
 
