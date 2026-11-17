@@ -9,6 +9,8 @@ const isFamily = (path: string) => path.startsWith('/famille/')
 
 /** Juste après l'ouverture, rien n'est encore en cours de saisie : on peut recharger. */
 const STARTUP_MS = 20_000
+/** Ouverture de Céréo (chargement du module, une fois par lancement). */
+const OPENED_AT = Date.now()
 /** Vérification régulière d'une nouvelle version, pour les postes qui restent ouverts. */
 const CHECK_EVERY_MS = 30 * 60_000
 
@@ -22,7 +24,6 @@ export default function PwaUpdatePrompt() {
   const [needRefresh, setNeedRefresh] = useState(false)
   const update = useRef<((reload?: boolean) => Promise<void>) | null>(null)
   const path = useRef(location.pathname)
-  const openedAt = useRef(Date.now())
 
   useEffect(() => {
     path.current = location.pathname
@@ -32,7 +33,7 @@ export default function PwaUpdatePrompt() {
     update.current = registerSW({
       onNeedRefresh() {
         setNeedRefresh(true)
-        const atStartup = Date.now() - openedAt.current < STARTUP_MS && !isFamily(path.current)
+        const atStartup = Date.now() - OPENED_AT < STARTUP_MS && !isFamily(path.current)
         if (!isLive(path.current) && (atStartup || document.hidden)) {
           update.current?.(true)
         }
