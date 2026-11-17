@@ -1,6 +1,7 @@
 import type { Biography, CeremonyType } from '../types'
 import { loadAppSettings } from './appSettings'
 import { isSafeEndpoint } from './endpoint'
+import { isServiceConfigured, serviceEndpoint, serviceHeaders } from './serviceAuth'
 
 export type AiErrorCause = 'not-configured' | 'offline' | 'network' | 'server'
 
@@ -14,14 +15,14 @@ export class AiGenerationError extends Error {
 }
 
 export function isAiConfigured(settings = loadAppSettings()): boolean {
-  return Boolean(settings.aiEndpointUrl.trim() && settings.aiAppToken.trim())
+  return isServiceConfigured(settings)
 }
 
 async function callWorker(path: string, body: unknown): Promise<string> {
   const settings = loadAppSettings()
   if (!isAiConfigured(settings)) {
     throw new AiGenerationError(
-      "La génération par IA n'est pas configurée. Renseignez l'adresse du service et le jeton d'application dans Paramètres.",
+      "La rédaction par IA n'est pas disponible sur ce poste : vérifiez la licence ou le service dans Paramètres.",
       'not-configured',
     )
   }
@@ -32,7 +33,7 @@ async function callWorker(path: string, body: unknown): Promise<string> {
     )
   }
 
-  const endpoint = settings.aiEndpointUrl.trim().replace(/\/+$/, '')
+  const endpoint = serviceEndpoint(settings)
   if (!isSafeEndpoint(endpoint)) {
     throw new AiGenerationError(
       "Adresse du service non reconnue : vérifiez-la dans Paramètres → Service en ligne (elle commence par https://).",
@@ -47,7 +48,7 @@ async function callWorker(path: string, body: unknown): Promise<string> {
   try {
     response = await fetch(`${endpoint}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Token': settings.aiAppToken.trim() },
+      headers: { 'Content-Type': 'application/json', ...serviceHeaders(settings) },
       body: JSON.stringify(body),
       signal: controller.signal,
     })

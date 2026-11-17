@@ -45,8 +45,14 @@ export async function verifyLicenseKey(rawKey: string): Promise<LicensePayload |
     if (!valid) return null
     const payload = JSON.parse(new TextDecoder().decode(payloadBytes)) as LicensePayload
     if (typeof payload.customer !== 'string' || typeof payload.seats !== 'number') return null
+    if (payload.expiresAt !== undefined && typeof payload.expiresAt !== 'number') return null
     return payload
   } catch {
     return null
   }
+}
+
+/** L'abonnement inscrit dans la clé est terminé. */
+export function isLicenseExpired(p: { expiresAt?: number }, now = Date.now()): boolean {
+  return typeof p.expiresAt === 'number' && p.expiresAt < now
 }

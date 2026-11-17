@@ -14,6 +14,7 @@ import LiveMode from './pages/LiveMode'
 import Projector from './pages/Projector'
 import Backup from './pages/Backup'
 import Settings from './pages/Settings'
+import Legal from './pages/Legal'
 import PwaUpdatePrompt from './components/PwaUpdatePrompt'
 import { attachOrphanPhotos, migrateMediaOwnership, removeNaturePhotoLibrary } from './lib/mediaOwnershipMigration'
 
@@ -28,6 +29,8 @@ export default function App() {
     <Routes>
       {/* Formulaire ouvert par la famille depuis son lien : public, sans licence. */}
       <Route path="/famille/:id/:key" element={<FamilyForm />} />
+      {/* Textes juridiques : publics, lisibles par les familles et les prospects. */}
+      <Route path="/legal/:page" element={<Legal />} />
       <Route
         path="*"
         element={

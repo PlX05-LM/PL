@@ -1,6 +1,7 @@
 import type { Ceremony, FamilyInvite, MeetingAnswers } from '../types'
 import { loadAppSettings } from './appSettings'
 import { isSafeEndpoint } from './endpoint'
+import { serviceEndpoint, serviceHeaders } from './serviceAuth'
 import { fromB64url, importFamilyKey as importKey, toB64url } from './familyCrypto'
 import { sanitizeMedia, sanitizeTexts, type FamilyMediaItem, type FamilyText } from './familyMedia'
 import { meetingSections, readField, writeField, type FieldValue, type MeetingField, type MeetingSection } from './meetingGuide'
@@ -240,17 +241,18 @@ export const inviteDurations = [3, 7, 14] as const
 /** Crée l'espace famille d'une cérémonie (service configuré dans Paramètres). */
 export async function createInvite(c: Ceremony, days: number): Promise<FamilyInvite> {
   const settings = loadAppSettings()
-  const endpoint = settings.aiEndpointUrl.trim().replace(/\/+$/, '')
-  if (!endpoint || !settings.aiAppToken.trim()) {
+  const endpoint = serviceEndpoint(settings)
+  const auth = serviceHeaders(settings)
+  if (!endpoint || !auth) {
     throw new FamilyLinkError(
-      'Le lien famille passe par le service en ligne de Céréo : renseignez son adresse et son jeton dans Paramètres.',
+      'Le lien famille passe par le service en ligne de Céréo, indisponible sur ce poste : vérifiez la licence dans Paramètres.',
     )
   }
   const id = toB64url(crypto.getRandomValues(new Uint8Array(16)))
   const key = toB64url(crypto.getRandomValues(new Uint8Array(32)))
   const body = await call(endpoint, id, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Token': settings.aiAppToken.trim() },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ ...(await encrypt(initialPayload(c), key)), ttlDays: days }),
   })
   const initialUpdatedAt = Number(body.updatedAt)
@@ -258,8 +260,7 @@ export async function createInvite(c: Ceremony, days: number): Promise<FamilyInv
 }
 
 export async function closeInvite(invite: FamilyInvite): Promise<void> {
-  const settings = loadAppSettings()
-  await call(invite.endpoint, invite.id, { method: 'DELETE', headers: { 'X-App-Token': settings.aiAppToken.trim() } })
+  await call(invite.endpoint, invite.id, { method: 'DELETE', headers: { ...serviceHeaders() } })
 }
 
 /** Lien à envoyer : tout ce qui suit « # » reste dans le téléphone, jamais sur un serveur. */

@@ -2,8 +2,9 @@ import Anthropic from '@anthropic-ai/sdk'
 import { familyExpiry, handleFamily } from './family'
 import { handleFamilyMedia } from './familyMedia'
 import { readTextCapped, sameSecret } from './secret'
+import { refundLicenseQuota, takeLicenseQuota, verifyLicense, type LicenseEnv, type LicenseInfo } from './license'
 
-export interface Env {
+export interface Env extends LicenseEnv {
   ANTHROPIC_API_KEY: string
   APP_TOKEN: string
   RATE_LIMIT: KVNamespace
@@ -12,8 +13,8 @@ export interface Env {
   /** Requêtes maximum par adresse IP et par heure. Optionnel, défaut 30. */
   RATE_LIMIT_PER_HOUR?: string
   /**
-   * Plafond global de rédactions par IA par jour, toutes adresses confondues. Optionnel,
-   * défaut 300. Borne la facture même si le jeton d'application venait à fuiter.
+   * Plafond global de rédactions par IA par jour, toutes agences confondues. Optionnel,
+   * défaut 2000. Filet de sécurité qui borne la facture quoi qu'il arrive.
    */
   DAILY_AI_LIMIT?: string
 }
@@ -41,7 +42,7 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-App-Token',
+    'Access-Control-Allow-Headers': 'Content-Type, X-App-Token, X-Licence',
     Vary: 'Origin',
   }
 }
@@ -76,7 +77,7 @@ const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max
 
 async function checkRateLimit(request: Request, env: Env): Promise<boolean> {
   const limit = Number(env.RATE_LIMIT_PER_HOUR ?? '30')
-  const dailyLimit = Number(env.DAILY_AI_LIMIT ?? '300')
+  const dailyLimit = Number(env.DAILY_AI_LIMIT ?? '2000')
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
   const hourBucket = Math.floor(Date.now() / 3_600_000)
   const key = `rl:${ip}:${hourBucket}`
@@ -277,8 +278,14 @@ export default {
       return json({ error: 'Méthode non autorisée.' }, 405, headers)
     }
 
+    // Accès : la licence de l'agence (cas normal) ou le jeton d'application (installation
+    // personnelle de l'éditeur, compatibilité).
+    let licence: LicenseInfo | null = null
     if (!(await sameSecret(request.headers.get('X-App-Token'), env.APP_TOKEN))) {
-      return json({ error: 'Jeton d\'application invalide.' }, 401, headers)
+      licence = await verifyLicense(request.headers.get('X-Licence'), env)
+      if (!licence) {
+        return json({ error: 'Licence non reconnue, expirée ou suspendue : contactez votre fournisseur Céréo.' }, 401, headers)
+      }
     }
 
     // La demande est validée AVANT d'être décomptée : des requêtes invalides ne peuvent pas
@@ -301,12 +308,18 @@ export default {
     if (!allowed) {
       return json({ error: 'Trop de requêtes — réessayez dans quelques minutes.' }, 429, headers)
     }
+    if (licence && !(await takeLicenseQuota(licence, env))) {
+      return json({ error: 'Quota mensuel de rédactions par IA atteint pour cette licence. Le générateur sans IA reste disponible.' }, 429, headers)
+    }
 
     try {
-      return await generate(env, prepared.system, prepared.brief, headers)
+      const response = await generate(env, prepared.system, prepared.brief, headers)
+      if (licence && !response.ok) await refundLicenseQuota(licence, env)
+      return response
     } catch (err) {
       // Le détail (réponse du fournisseur d'IA) reste dans les journaux du service.
       console.error('generate', err)
+      if (licence) await refundLicenseQuota(licence, env).catch(() => {})
       return json({ error: 'La rédaction par IA a échoué. Réessayez dans un instant.' }, 502, headers)
     }
   },

@@ -18,7 +18,7 @@ export async function getVerifiedLicense(): Promise<LicenseRecord | null> {
   if (!record?.token) return null
   const payload = await verifyLicenseKey(record.token)
   if (!payload) return null
-  return { ...record, customer: payload.customer, seats: payload.seats }
+  return { ...record, customer: payload.customer, seats: payload.seats, expiresAt: payload.expiresAt }
 }
 
 export async function activateLicense(token: string, payload: LicensePayload): Promise<LicenseRecord> {
@@ -28,6 +28,7 @@ export async function activateLicense(token: string, payload: LicensePayload): P
     customer: payload.customer,
     seats: payload.seats,
     activatedAt: Date.now(),
+    expiresAt: payload.expiresAt,
   }
   await db.license.put(record)
   return record

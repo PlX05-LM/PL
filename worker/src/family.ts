@@ -12,8 +12,9 @@
 
 import { readTextCapped, sameSecret } from './secret'
 import { deleteAllFamilyMedia } from './familyMedia'
+import { verifyLicense, type LicenseEnv } from './license'
 
-interface FamilyEnv {
+interface FamilyEnv extends LicenseEnv {
   APP_TOKEN: string
   RATE_LIMIT: KVNamespace
 }
@@ -27,7 +28,7 @@ interface FamilyRecord {
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{22}$/
 const MAX_PAYLOAD_CHARS = 400_000
-const MAX_TTL_DAYS = 30
+const MAX_TTL_DAYS = 14
 /**
  * Délai minimal entre deux enregistrements d'un même lien. Le formulaire famille regroupe
  * déjà ses envois ; ce garde-fou empêche quelqu'un qui détient un lien de le marteler et
@@ -71,13 +72,15 @@ export async function familyExpiry(env: FamilyEnv, id: string): Promise<number |
 
 export async function handleFamily(request: Request, env: FamilyEnv, id: string, json: Json): Promise<Response> {
   if (!ID_PATTERN.test(id)) return json({ error: 'Lien invalide.' }, 404)
-  const hasAppToken = await sameSecret(request.headers.get('X-App-Token'), env.APP_TOKEN)
+  const hasAppToken =
+    (await sameSecret(request.headers.get('X-App-Token'), env.APP_TOKEN)) ||
+    (request.method !== 'GET' && request.method !== 'PUT' && (await verifyLicense(request.headers.get('X-Licence'), env)) !== null)
   const existing = await env.RATE_LIMIT.get<FamilyRecord>(key(id), 'json')
   const alive = existing && existing.expiresAt > Date.now() ? existing : null
 
   switch (request.method) {
     case 'POST': {
-      if (!hasAppToken) return json({ error: "Jeton d'application invalide." }, 401)
+      if (!hasAppToken) return json({ error: 'Accès refusé : licence non reconnue, expirée ou suspendue.' }, 401)
       if (existing) return json({ error: 'Ce lien existe déjà.' }, 409)
       const body = await readBody(request, json)
       if (body instanceof Response) return body
@@ -102,7 +105,7 @@ export async function handleFamily(request: Request, env: FamilyEnv, id: string,
       return json({ updatedAt: record.updatedAt, expiresAt: record.expiresAt }, 200)
     }
     case 'DELETE': {
-      if (!hasAppToken) return json({ error: "Jeton d'application invalide." }, 401)
+      if (!hasAppToken) return json({ error: 'Accès refusé : licence non reconnue, expirée ou suspendue.' }, 401)
       await env.RATE_LIMIT.delete(key(id))
       await deleteAllFamilyMedia(env, id)
       return json({ ok: true }, 200)

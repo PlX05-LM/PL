@@ -3,6 +3,8 @@ import { changePassword, getVerifiedLicense, listAccounts, loadSession, verifyLo
 import type { AccountRecord, LicenseRecord } from '../lib/licensing/types'
 import { loadAppSettings, saveAppSettings, type AppSettings } from '../lib/appSettings'
 import { generateSegmentTextAI } from '../lib/aiGeneration'
+import { isServiceConfigured, usesBuiltInService } from '../lib/serviceAuth'
+import LegalLinks from '../components/LegalLinks'
 import BackButton from '../components/BackButton'
 import { UnavailableBadge } from '../components/Unavailable'
 import Icon from '../components/Icon'
@@ -196,51 +198,22 @@ export default function Settings() {
       <section className="mb-6 rounded-lg border border-line bg-panel p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="font-display text-lg text-fg">Service en ligne : IA et lien famille</h3>
-          {settings.aiEndpointUrl.trim() && settings.aiAppToken.trim() ? (
+          {isServiceConfigured(settings) ? (
             <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gold">
-              Configuré
+              {usesBuiltInService(settings) ? 'Inclus avec la licence' : 'Service personnel'}
             </span>
           ) : (
-            <UnavailableBadge label="Non configuré" />
+            <UnavailableBadge label="Indisponible" />
           )}
         </div>
-        <p className="mb-2 text-xs text-muted">
-          Sans ce service, la rédaction par IA et le lien famille sont indisponibles ; tout le reste
-          fonctionne. Mise en place pas à pas, sans terminal :{' '}
-          <code className="text-fg">worker/README.md</code>, « Déploiement sans terminal ».
+        <p className="mb-4 text-xs leading-relaxed text-muted">
+          La rédaction par IA et le lien famille passent par le service en ligne de Céréo, ouvert par votre licence :
+          rien à régler. Ils demandent une connexion internet ; sans réseau (cimetière, salle sans wifi), le générateur
+          de textes sans IA prend le relais et tout le reste fonctionne.
         </p>
-        <p className="mb-4 text-xs text-muted">
-          Optionnelle et désactivée par défaut : l'application reste 100% locale sans cette
-          configuration. Une fois activée, l'IA vient s'ajouter au générateur local (sans IA,
-          toujours disponible) pour l'ébauche biographique et les étapes du déroulé. Nécessite une
-          connexion internet — indisponible par exemple lors d'une cérémonie en cimetière hors
-          réseau ; l'application détecte automatiquement l'absence de réseau et propose alors le
-          générateur local. Un service à héberger vous-même : voir{' '}
-          <code className="text-fg">worker/README.md</code> dans le dépôt du projet pour le mettre
-          en place.
-        </p>
-        <label className="mb-3 block text-xs text-muted">
-          Adresse du service (URL du worker)
-          <input
-            value={settings.aiEndpointUrl}
-            onChange={(e) => update('aiEndpointUrl', e.target.value)}
-            placeholder="https://cereo-ai-proxy.votre-compte.workers.dev"
-            className={`mt-1 ${inputClass}`}
-          />
-        </label>
-        <label className="mb-3 block text-xs text-muted">
-          Jeton d'application
-          <input
-            type="password"
-            value={settings.aiAppToken}
-            onChange={(e) => update('aiAppToken', e.target.value)}
-            placeholder="le même jeton que celui défini côté service"
-            className={`mt-1 ${inputClass}`}
-          />
-        </label>
         <button
           onClick={handleTestAi}
-          disabled={testingAi || !settings.aiEndpointUrl.trim() || !settings.aiAppToken.trim()}
+          disabled={testingAi || !isServiceConfigured(settings)}
           className="rounded-md border border-line px-3 py-1.5 text-xs text-muted hover:border-gold-dim hover:text-gold disabled:opacity-40"
         >
           {testingAi ? 'Test en cours…' : 'Tester la connexion'}
@@ -251,10 +224,32 @@ export default function Settings() {
         {aiTestResult === 'error' && (
           <p className="mt-2 text-xs text-danger">✕ {aiTestMessage}</p>
         )}
-        <p className="mt-4 flex items-start justify-between gap-3 border-t border-line pt-3 text-xs text-muted">
-          <span>Suivi de la consommation de l'IA par agence et accès lié à chaque licence.</span>
-          <UnavailableBadge label="Bientôt" />
-        </p>
+        <details className="mt-4 border-t border-line pt-3" open={!usesBuiltInService(settings) && Boolean(settings.aiEndpointUrl || settings.aiAppToken)}>
+          <summary className="cursor-pointer text-xs text-muted hover:text-fg">Réglages avancés : service personnel</summary>
+          <p className="mt-2 mb-3 text-xs text-muted">
+            Seulement pour utiliser votre propre service (voir <code className="text-fg">worker/README.md</code>).
+            Laissez vide pour le service inclus avec la licence.
+          </p>
+          <label className="mb-3 block text-xs text-muted">
+            Adresse du service (URL du worker)
+            <input
+              value={settings.aiEndpointUrl}
+              onChange={(e) => update('aiEndpointUrl', e.target.value)}
+              placeholder="https://cereo-ai-proxy.votre-compte.workers.dev"
+              className={`mt-1 ${inputClass}`}
+            />
+          </label>
+          <label className="block text-xs text-muted">
+            Jeton d'application
+            <input
+              type="password"
+              value={settings.aiAppToken}
+              onChange={(e) => update('aiAppToken', e.target.value)}
+              placeholder="le même jeton que celui défini côté service"
+              className={`mt-1 ${inputClass}`}
+            />
+          </label>
+        </details>
       </section>
 
       <section className="rounded-lg border border-line bg-panel p-5">
@@ -262,7 +257,11 @@ export default function Settings() {
         {license && (
           <p className="mb-3 text-sm text-muted">
             Licence activée pour <span className="text-fg">{license.customer}</span> —{' '}
-            {accounts.length}/{license.seats} identifiant(s) utilisé(s).
+            {accounts.length}/{license.seats} identifiant(s) utilisé(s)
+            {license.expiresAt
+              ? ` — abonnement jusqu'au ${new Date(license.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`
+              : ''}
+            .
           </p>
         )}
         {license && session && <LicenseKeyReveal token={license.token} username={session.username} />}
@@ -310,6 +309,7 @@ export default function Settings() {
           Mettre à jour
         </button>
       </section>
+      <LegalLinks className="mt-8" />
     </div>
   )
 }

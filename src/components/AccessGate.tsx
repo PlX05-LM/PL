@@ -1,5 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { verifyLicenseKey } from '../lib/licensing/license'
+import { isLicenseExpired, verifyLicenseKey } from '../lib/licensing/license'
+import { setServiceLicence } from '../lib/serviceAuth'
+import { exportFullBackup } from '../lib/backup'
+import { contactEmail } from '../legal/editor'
+import LegalLinks from './LegalLinks'
 import {
   activateLicense,
   createAccount,
@@ -11,7 +15,9 @@ import {
 } from '../lib/licensing/store'
 import type { AccountRecord, LicenseRecord } from '../lib/licensing/types'
 
-type Stage = 'loading' | 'activation' | 'create-account' | 'login' | 'unlocked'
+type Stage = 'loading' | 'activation' | 'expired' | 'create-account' | 'login' | 'unlocked'
+
+const formatDay = (t: number) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 
 const inputClass =
   'w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-sm text-fg outline-none focus:border-gold-dim'
@@ -38,9 +44,16 @@ export default function AccessGate({ children }: { children: ReactNode }) {
     const lic = await getVerifiedLicense()
     setLicense(lic)
     if (!lic) {
+      setServiceLicence(null)
       setStage('activation')
       return
     }
+    if (isLicenseExpired(lic)) {
+      setServiceLicence(null)
+      setStage('expired')
+      return
+    }
+    setServiceLicence(lic.token)
     const accs = await listAccounts()
     setAccounts(accs)
     if (accs.length === 0) {
@@ -69,9 +82,13 @@ export default function AccessGate({ children }: { children: ReactNode }) {
         setActivationError("Clé d'activation invalide.")
         return
       }
-      const record = await activateLicense(keyInput.trim(), payload)
-      setLicense(record)
-      setStage('create-account')
+      if (isLicenseExpired(payload)) {
+        setActivationError(`Cette clé a expiré le ${formatDay(payload.expiresAt!)}.`)
+        return
+      }
+      await activateLicense(keyInput.trim(), payload)
+      setKeyInput('')
+      await refresh()
     } finally {
       setActivating(false)
     }
@@ -124,11 +141,33 @@ export default function AccessGate({ children }: { children: ReactNode }) {
       <div className="w-full max-w-sm rounded-lg border border-line bg-panel p-6">
         <h1 className="mb-1 font-display text-xl tracking-wide text-gold">Céréo</h1>
 
-        {stage === 'activation' && (
+        {(stage === 'activation' || stage === 'expired') && (
           <>
-            <p className="mb-4 text-sm text-muted">
-              Entrez la clé d'activation fournie lors de l'achat du logiciel.
-            </p>
+            {stage === 'expired' && license?.expiresAt ? (
+              <div className="mb-4 space-y-3">
+                <p className="text-sm text-fg">
+                  L'abonnement Céréo ({license.customer}) a pris fin le {formatDay(license.expiresAt)}.
+                </p>
+                <p className="text-xs leading-relaxed text-muted">
+                  Vos dossiers sont toujours sur ce poste. Téléchargez-en une copie à tout moment, ou entrez la
+                  nouvelle clé reçue au renouvellement.
+                </p>
+                <button
+                  onClick={() => exportFullBackup().catch(() => setActivationError('La sauvegarde a échoué.'))}
+                  className="w-full rounded-md border border-gold-dim px-4 py-2 text-sm text-gold hover:bg-panel-2"
+                >
+                  Télécharger une sauvegarde de mes dossiers
+                </button>
+              </div>
+            ) : (
+              <div className="mb-4 space-y-2">
+                <p className="text-sm leading-relaxed text-fg">
+                  Le logiciel des cérémonies funéraires : rencontre avec la famille, textes rédigés, diaporama et régie
+                  le jour J.
+                </p>
+                <p className="text-sm text-muted">Entrez la clé d'activation reçue avec votre abonnement.</p>
+              </div>
+            )}
             <textarea
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
@@ -144,6 +183,14 @@ export default function AccessGate({ children }: { children: ReactNode }) {
             >
               {activating ? 'Vérification…' : 'Activer'}
             </button>
+            {stage === 'activation' && contactEmail() && (
+              <a
+                href={`mailto:${contactEmail()}?subject=${encodeURIComponent('Essai gratuit de Céréo')}`}
+                className="mt-3 block w-full rounded-md border border-line px-4 py-2 text-center text-sm text-fg hover:border-gold-dim"
+              >
+                Pas encore de clé ? Demander un essai gratuit de 30 jours
+              </a>
+            )}
           </>
         )}
 
@@ -222,6 +269,7 @@ export default function AccessGate({ children }: { children: ReactNode }) {
             )}
           </>
         )}
+        <LegalLinks className="mt-6 border-t border-line pt-4" />
       </div>
     </div>
   )
