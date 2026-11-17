@@ -30,8 +30,8 @@ export async function verifyLicenseKey(rawKey: string): Promise<LicensePayload |
   const publicKey = await getPublicKey()
   if (!publicKey) return null
   try {
-    const trimmed = rawKey.trim()
-    const key = trimmed.startsWith(PREFIX) ? trimmed.slice(PREFIX.length) : trimmed
+    // « CEREMA- » : préfixe des premières clés, avant le renommage en Céréo (même signature).
+    const key = rawKey.trim().replace(/^CEREMA-/, '').replace(new RegExp(`^${PREFIX}`), '')
     const [payloadB64, sigB64] = key.split('.')
     if (!payloadB64 || !sigB64) return null
     const payloadBytes = base64UrlToBytes(payloadB64)

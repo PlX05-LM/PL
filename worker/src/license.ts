@@ -57,7 +57,7 @@ function fromB64url(text: string): Uint8Array {
 export async function verifyLicense(raw: string | null, env: LicenseEnv): Promise<LicenseInfo | null> {
   if (!raw || raw.length > MAX_TOKEN_LENGTH) return null
   try {
-    const token = raw.trim().replace(/^CEREO-/, '')
+    const token = raw.trim().replace(/^CERE(?:O|MA)-/, '')
     const [payloadB64, sigB64] = token.split('.')
     if (!payloadB64 || !sigB64) return null
     const payloadBytes = fromB64url(payloadB64)
