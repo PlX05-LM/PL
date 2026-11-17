@@ -33,3 +33,21 @@ if (navToggle && primaryNav) {
     });
   });
 }
+
+const heroVideo = document.querySelector('.hero-video');
+const heroLogoDrop = document.querySelector('.hero-logo-drop');
+
+if (heroVideo && heroLogoDrop) {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (reduceMotion) {
+    heroVideo.remove();
+    heroLogoDrop.classList.add('show');
+  } else {
+    heroVideo.addEventListener('ended', () => heroLogoDrop.classList.add('show'));
+    heroVideo.addEventListener('error', () => {
+      heroVideo.remove();
+      heroLogoDrop.classList.add('show');
+    });
+  }
+}
