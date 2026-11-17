@@ -26,37 +26,40 @@ export default function App() {
   }, [])
 
   return (
-    <Routes>
-      {/* Formulaire ouvert par la famille depuis son lien : public, sans licence. */}
-      <Route path="/famille/:id/:key" element={<FamilyForm />} />
-      {/* Textes juridiques : publics, lisibles par les familles et les prospects. */}
-      <Route path="/legal/:page" element={<Legal />} />
-      <Route
-        path="*"
-        element={
-          <AccessGate>
-            <Routes>
-              <Route path="/projector/:id" element={<Projector />} />
-              <Route path="/ceremonies/:id/live" element={<LiveMode />} />
-              <Route path="/ceremonies/:id/questionnaire" element={<PaperQuestionnaire />} />
-              <Route element={<AppShell />}>
-                <Route path="/" element={<Home />} />
-                <Route path="/rencontre" element={<Dashboard module="rencontre" />} />
-                <Route path="/conception" element={<Dashboard module="conception" />} />
-                <Route path="/regie" element={<Dashboard module="regie" />} />
-                <Route path="/dossiers" element={<Dashboard />} />
-                <Route path="/ceremonies/:id" element={<CeremonyEditor />} />
-                <Route path="/ceremonies/:id/rencontre" element={<Meeting />} />
-                <Route path="/ceremonies/:id/biographie" element={<Biography />} />
-                <Route path="/musique" element={<MusicLibrary />} />
-                <Route path="/sauvegarde" element={<Backup />} />
-                <Route path="/parametres" element={<Settings />} />
-              </Route>
-            </Routes>
-            <PwaUpdatePrompt />
-          </AccessGate>
-        }
-      />
-    </Routes>
+    <>
+      <Routes>
+        {/* Formulaire ouvert par la famille depuis son lien : public, sans licence. */}
+        <Route path="/famille/:id/:key" element={<FamilyForm />} />
+        {/* Textes juridiques : publics, lisibles par les familles et les prospects. */}
+        <Route path="/legal/:page" element={<Legal />} />
+        <Route
+          path="*"
+          element={
+            <AccessGate>
+              <Routes>
+                <Route path="/projector/:id" element={<Projector />} />
+                <Route path="/ceremonies/:id/live" element={<LiveMode />} />
+                <Route path="/ceremonies/:id/questionnaire" element={<PaperQuestionnaire />} />
+                <Route element={<AppShell />}>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/rencontre" element={<Dashboard module="rencontre" />} />
+                  <Route path="/conception" element={<Dashboard module="conception" />} />
+                  <Route path="/regie" element={<Dashboard module="regie" />} />
+                  <Route path="/dossiers" element={<Dashboard />} />
+                  <Route path="/ceremonies/:id" element={<CeremonyEditor />} />
+                  <Route path="/ceremonies/:id/rencontre" element={<Meeting />} />
+                  <Route path="/ceremonies/:id/biographie" element={<Biography />} />
+                  <Route path="/musique" element={<MusicLibrary />} />
+                  <Route path="/sauvegarde" element={<Backup />} />
+                  <Route path="/parametres" element={<Settings />} />
+                </Route>
+              </Routes>
+            </AccessGate>
+          }
+        />
+      </Routes>
+      {/* Hors de l'accès protégé : les mises à jour arrivent même sur l'écran d'activation. */}
+      <PwaUpdatePrompt />
+    </>
   )
 }
