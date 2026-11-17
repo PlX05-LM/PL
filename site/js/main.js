@@ -36,18 +36,38 @@ if (navToggle && primaryNav) {
 
 const heroVideo = document.querySelector('.hero-video');
 const heroLogoDrop = document.querySelector('.hero-logo-drop');
+const heroReplay = document.getElementById('heroReplay');
 
 if (heroVideo && heroLogoDrop) {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   if (reduceMotion) {
     heroVideo.remove();
+    document.querySelectorAll('.hero-vignette, .hero-grain').forEach((el) => el.remove());
+    if (heroReplay) heroReplay.remove();
     heroLogoDrop.classList.add('show');
   } else {
-    heroVideo.addEventListener('ended', () => heroLogoDrop.classList.add('show'));
+    const reveal = () => {
+      heroLogoDrop.classList.add('show');
+      if (heroReplay) heroReplay.classList.add('show');
+    };
+
+    heroVideo.addEventListener('ended', reveal);
     heroVideo.addEventListener('error', () => {
       heroVideo.remove();
-      heroLogoDrop.classList.add('show');
+      reveal();
     });
+
+    if (heroReplay) {
+      heroReplay.addEventListener('click', () => {
+        heroLogoDrop.classList.remove('show');
+        heroReplay.classList.remove('show');
+        heroVideo.currentTime = 0;
+        heroVideo.style.animation = 'none';
+        void heroVideo.offsetWidth; // force reflow pour rejouer le zoom CSS
+        heroVideo.style.animation = '';
+        heroVideo.play();
+      });
+    }
   }
 }
