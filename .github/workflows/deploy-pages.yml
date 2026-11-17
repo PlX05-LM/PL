@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - claude/funeral-ceremony-management-software-6f2ydn
+      - claude/maitre-ceremonie-website-q50hku
   workflow_dispatch:
 
 permissions:
@@ -29,6 +30,7 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES: 'true'
+      - run: cp -r site dist/vitrine
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
