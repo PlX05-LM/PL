@@ -40,6 +40,10 @@ export default defineConfig({
         // seule la coquille de l'application (JS/CSS/HTML/icônes) est mise en cache ici.
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
         navigateFallback: `${base}index.html`,
+        // Le site vitrine statique (site/, publié sous /PL/vitrine/) n'a rien à voir avec
+        // cette appli : sans ça, le service worker de Céréma intercepte sa navigation et
+        // renvoie l'index de Céréma à la place.
+        navigateFallbackDenylist: [/^\/PL\/vitrine\//],
       },
     }),
   ],
