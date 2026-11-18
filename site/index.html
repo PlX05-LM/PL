@@ -32,41 +32,45 @@
 
 <main id="top">
 
-  <section class="hero">
-    <div class="wrap hero-inner">
-      <div class="hero-text">
-        <p class="eyebrow hero-anim d1">Maître de cérémonie indépendant · Manche &amp; Calvados</p>
-        <h1 class="hero-anim d2">Un accompagnement sur mesure, pour dire au revoir à l'image de ceux que vous aimez.</h1>
-        <p class="hero-lead hero-anim d3">
+  <section class="hero" id="hero">
+    <div class="hero-stage">
+      <div class="hero-zoom" id="heroZoom">
+        <video
+          id="heroFilm"
+          class="hero-film"
+          muted
+          playsinline
+          preload="auto"
+          poster="assets/hero-petals-poster.jpg"
+          disablepictureinpicture
+          aria-hidden="true"
+        >
+          <source src="assets/hero-petals.webm" type="video/webm">
+          <source src="assets/hero-petals.mp4" type="video/mp4">
+        </video>
+        <div class="hero-shade"></div>
+        <div class="hero-vignette" aria-hidden="true"></div>
+        <div class="hero-grain" aria-hidden="true"></div>
+      </div>
+
+      <div class="hero-intro" id="heroIntro">
+        <p class="eyebrow">Maître de cérémonie indépendant · Manche &amp; Calvados</p>
+        <h1>Un accompagnement sur mesure, pour dire au revoir à l'image de ceux que vous aimez.</h1>
+      </div>
+
+      <div class="hero-outro" id="heroOutro">
+        <img src="assets/logo-transparent.png" alt="Paul Funéraire" class="hero-outro-logo">
+        <p class="hero-lead">
           Chaque famille est différente, chaque vie l'est aussi. Je construis avec vous une cérémonie
           qui vous ressemble — laïque, religieuse ou au crématorium — plutôt qu'un texte tout fait.
         </p>
-        <a href="#contact" class="btn btn-primary hero-anim d4">Échanger sur votre projet</a>
-      </div>
-      <div class="hero-logo hero-anim d2">
-        <div class="hero-video-wrap">
-          <video
-            class="hero-video"
-            autoplay
-            muted
-            playsinline
-            preload="auto"
-            poster="assets/hero-petals-poster.jpg"
-            aria-hidden="true"
-          >
-            <source src="assets/hero-petals.webm" type="video/webm">
-            <source src="assets/hero-petals.mp4" type="video/mp4">
-          </video>
-          <div class="hero-vignette" aria-hidden="true"></div>
-          <div class="hero-grain" aria-hidden="true"></div>
-          <img
-            src="assets/logo-transparent.png"
-            alt="Paul Funéraire — maître de cérémonie indépendant"
-            class="hero-logo-drop"
-          >
+        <div class="hero-cta">
+          <a href="#contact" class="btn btn-primary">Échanger sur votre projet</a>
+          <button type="button" class="btn btn-ghost" id="heroReplay">Revoir le geste</button>
         </div>
-        <button type="button" class="hero-replay" id="heroReplay">Revoir le geste</button>
       </div>
+
+      <div class="hero-cue" id="heroCue"><span>Faites défiler</span><i></i></div>
     </div>
   </section>
 
